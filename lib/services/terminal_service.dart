@@ -23,22 +23,35 @@ class TerminalBridge {
   static int? _axsPort;
   static Process? _axsProcess;
   static final Map<String, WebSocket> _sockets = {};
+  static const _axsTimeout = Duration(seconds: 10);
 
   // ── AXS binary management ──────────────────────────────────────────
 
   static Future<File> _axsBinary() async {
+    // Сначала пробуем libaxs.so из nativeLibraryDir (обход noexec/W^X)
+    final native = await _axsBinaryFromNativeLib();
+    if (native != null) return native;
+
+    // Fallback: копируем из assets
     final dir = await getApplicationSupportDirectory();
     final axsDir = Directory('${dir.path}/axs');
     final axsFile = File('${axsDir.path}/axs');
     if (await axsFile.exists()) return axsFile;
 
-    // Копируем из assets при первом запуске
     await axsDir.create(recursive: true);
     final byteData = await rootBundle.load('assets/axs/axs');
     await axsFile.writeAsBytes(byteData.buffer.asUint8List());
-    // chmod 755
-    await Process.run('chmod', ['755', axsFile.path]);
     return axsFile;
+  }
+
+  static Future<File?> _axsBinaryFromNativeLib() async {
+    try {
+      final nativeDir = await _method.invokeMethod<String>('getNativeLibraryDir') ??
+          '/data/app/com.xunkal1.xuncode/lib/arm64';
+      final file = File('$nativeDir/libaxs.so');
+      if (await file.exists() && await file.length() > 0) return file;
+    } catch (_) {}
+    return null;
   }
 
   static Future<void> _ensureAxs() async {
@@ -58,15 +71,31 @@ class TerminalBridge {
       'LD_LIBRARY_PATH': nativeDir,
     });
 
-    await for (final line in _axsProcess!.stdout
+    final portFuture = _axsProcess!.stdout
         .transform(utf8.decoder)
-        .transform(const LineSplitter())) {
+        .transform(const LineSplitter())
+        .firstWhere(
+          (line) => RegExp(r'started on .*:(\d+)').hasMatch(line),
+          orElse: () => '',
+        )
+        .then((line) {
       final match = RegExp(r'started on .*:(\d+)').firstMatch(line);
       if (match != null) {
         _axsPort = int.parse(match.group(1)!);
-        break;
       }
-    }
+      return _axsPort;
+    });
+
+    await Future.any([
+      portFuture,
+      Future.delayed(_axsTimeout, () => throw TimeoutException('AXS start timeout')),
+    ]);
+  }
+
+  static Future<WebSocket> _connectWs(int port) async {
+    return WebSocket.connect(
+      'ws://127.0.0.1:$port/terminals/new',
+    ).timeout(const Duration(seconds: 5));
   }
 
   /// Путь к rootfs Alpine
@@ -320,17 +349,7 @@ class TerminalSession {
   Future<void> _open() async {
     await TerminalBridge._ensureAxs();
     final port = TerminalBridge._axsPort ?? 8767;
-    final uri = Uri.parse('ws://127.0.0.1:$port/terminals/new');
-
-    final request = await HttpClient().openUrl('GET', uri);
-    request.headers.add('Upgrade', 'websocket');
-    request.headers.add('Connection', 'Upgrade');
-    request.headers.add('Sec-WebSocket-Key', base64.encode(List<int>.generate(16, (_) => 0)));
-    request.headers.add('Sec-WebSocket-Version', '13');
-
-    final response = await request.close();
-    final socket = await response.detachSocket();
-    final ws = WebSocket.fromUpgradedSocket(socket, serverSide: false);
+    final ws = await TerminalBridge._connectWs(port);
     TerminalBridge._sockets[id] = ws;
 
     ws.listen(

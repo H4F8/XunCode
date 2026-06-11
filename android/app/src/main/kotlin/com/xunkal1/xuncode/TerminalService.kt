@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap
 class TerminalService(private val appContext: Context) {
 
     private val sessions = ConcurrentHashMap<String, TerminalSession>()
+    private val outputHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     fun appDataDir(): File {
         val ext = appContext.getExternalFilesDir(null) ?: appContext.filesDir
@@ -132,6 +133,7 @@ class TerminalSession(
     private var process: Process? = null
     private var writer: OutputStream? = null
     private var readerThread: Thread? = null
+    private var isClosing = false
 
     fun start(): String {
         if (useSystemSh) return startSystemSh()
@@ -217,16 +219,31 @@ class TerminalSession(
 
     private fun pumpOutput(p: Process) {
         val reader = BufferedReader(InputStreamReader(p.inputStream, Charsets.UTF_8))
+        val batch = StringBuilder(8192)
         val buf = CharArray(4096)
         try {
             while (!Thread.currentThread().isInterrupted) {
                 val n = reader.read(buf)
                 if (n <= 0) break
-                val text = String(buf, 0, n)
-                postToMain { runCatching { sink.success(text) } }
+                batch.append(buf, 0, n)
+                if (batch.endsWith("\n") || batch.length >= 4096) {
+                    flushBatch(batch)
+                }
             }
         } catch (_: Throwable) {}
-        finally { postToMain { runCatching { sink.endOfStream() } } }
+        finally {
+            flushBatch(batch)
+            if (!isClosing) {
+                service.outputHandler.post { runCatching { sink.endOfStream() } }
+            }
+        }
+    }
+
+    private fun flushBatch(batch: StringBuilder) {
+        if (batch.isEmpty()) return
+        val text = batch.toString()
+        batch.setLength(0)
+        service.outputHandler.post { runCatching { sink.success(text) } }
     }
 
     fun write(data: String): Boolean {
@@ -238,6 +255,8 @@ class TerminalSession(
     fun resize(c: Int, r: Int) { cols = c; rows = r }
 
     fun kill() {
+        if (isClosing) return
+        isClosing = true
         runCatching { writer?.close() }
         runCatching { process?.destroy() }
         runCatching { readerThread?.interrupt() }

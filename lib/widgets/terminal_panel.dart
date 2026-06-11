@@ -7,9 +7,9 @@ import '../app/theme.dart';
 import '../services/language_service.dart';
 import '../services/terminal_service.dart';
 
-/// Embedded terminal panel — multi-tab proot+Alpine shells. Designed to be
+/// Embedded terminal panel ÄËĂÂĂÂ multi-tab proot+Alpine shells. Designed to be
 /// dropped under the editor on tablets, or pulled up as a draggable sheet on
-/// phones (see editor_screen.dart §3 / §4).
+/// phones (see editor_screen.dart ÄÂĂÂ§3 / ÄÂĂÂ§4).
 class TerminalPanel extends StatefulWidget {
   final VoidCallback? onClose;
   final double? minHeight;
@@ -36,7 +36,7 @@ class _TerminalPanelState extends State<TerminalPanel> with TickerProviderStateM
   }
 
   Future<void> _bootstrap() async {
-    // proot встроен в APК через jniLibs — скачивание не требуется
+    // proot ĂÂĂÂÄšÂĂÂÄšÂĂÂÄšÂĂÂĂÂÄšĹžĂÂĂĹžĂÂĂÂ ĂÂĂÂ APĂÂĂÂ ÄšÂĂÂĂÂĂĹžÄšÂĂÂĂÂĂĹžĂÂĂÂ jniLibs ÄËĂÂĂÂ ÄšÂĂÂĂÂÄšÂĂÂĂÂ°ÄšÂĂÂĂÂĂÂ¸ĂÂĂÂĂÂĂÂ°ĂÂĂÂĂÂĂÂ¸ĂÂĂĹž ĂÂĂÂĂÂĂĹž ÄšÂĂÂÄšÂĂÂĂÂĂĹžĂÂĂÂÄšÂĂÂĂÂĂĹžÄšÂĂÂÄšÂĂÂÄšÂĂÂ
     final installed = await TerminalBridge.isAlpineInstalled();
     if (!installed) {
       await _installAlpine();
@@ -336,14 +336,37 @@ class _Tab {
   final FocusNode focus = FocusNode();
   final ValueNotifier<String> buffer = ValueNotifier('');
   StreamSubscription? sub;
+  final StringBuffer _pending = StringBuffer();
+  Timer? _flushTimer;
+  static final _ansiExp = RegExp(
+    r'\x1B\[[0-9;?]*[ -/]*[@-~]'
+    r'|\x1B\][^\x07]*\x07'
+    r'|\x1B[()][AB012]',
+  );
 
   _Tab({required this.session}) {
-    sub = session.output.listen((chunk) {
-      buffer.value = buffer.value + _stripAnsi(chunk);
-    });
+    sub = session.output.listen(_onChunk);
+  }
+
+  void _onChunk(String chunk) {
+    _pending.write(chunk);
+    _flushTimer?.cancel();
+    _flushTimer = Timer(const Duration(milliseconds: 50), _flushBuffer);
+  }
+
+  void _flushBuffer() {
+    if (_pending.isEmpty) return;
+    final text = _pending.toString()
+        .replaceAll(_ansiExp, '')
+        .replaceAll('\r\n', '\n')
+        .replaceAll('\r', '\n');
+    _pending.clear();
+    buffer.value = buffer.value + text;
   }
 
   void dispose() {
+    _flushTimer?.cancel();
+    _flushBuffer();
     sub?.cancel();
     scroll.dispose();
     input.dispose();
@@ -362,34 +385,49 @@ class _TerminalView extends StatefulWidget {
 
 class _TerminalViewState extends State<_TerminalView> {
   bool _ctrlMod = false;
+  bool _userScrolledUp = false;
 
   @override
   void initState() {
     super.initState();
     widget.tab.buffer.addListener(_scrollToBottom);
+    widget.tab.scroll.addListener(_onScroll);
   }
 
   @override
   void dispose() {
     widget.tab.buffer.removeListener(_scrollToBottom);
+    widget.tab.scroll.removeListener(_onScroll);
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (!widget.tab.scroll.hasClients) return;
+    final pos = widget.tab.scroll.position;
+    _userScrolledUp = pos.pixels < pos.maxScrollExtent - 40;
   }
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!widget.tab.scroll.hasClients) return;
-      widget.tab.scroll.jumpTo(widget.tab.scroll.position.maxScrollExtent);
+      if (_userScrolledUp) return;
+      final max = widget.tab.scroll.position.maxScrollExtent;
+      widget.tab.scroll.animateTo(
+        max,
+        duration: Duration.zero,
+        curve: Curves.easeOut,
+      );
     });
   }
 
-  Future<void> _send(String text) async {
-    await widget.tab.session.write(text);
+  void _send(String text) {
+    widget.tab.session.write(text);
   }
 
   Future<void> _submit() async {
     final cmd = widget.tab.input.text;
     widget.tab.input.clear();
-    await _send('$cmd\n');
+    _send('$cmd\n');
     widget.tab.focus.requestFocus();
   }
 
@@ -435,10 +473,10 @@ class _TerminalViewState extends State<_TerminalView> {
           _modKey('Ctrl', _ctrlMod, () => setState(() => _ctrlMod = !_ctrlMod)),
           _key('Esc', () => _send('')),
           _key('Tab', () => _send('\t')),
-          _key('↑', () => _send('[A')),
-          _key('↓', () => _send('[B')),
-          _key('←', () => _send('[D')),
-          _key('→', () => _send('[C')),
+          _key('ÄËĂÂĂÂ', () => _send('[A')),
+          _key('ÄËĂÂĂÂ', () => _send('[B')),
+          _key('ÄËĂÂĂÂ', () => _send('[D')),
+          _key('ÄËĂÂĂÂ', () => _send('[C')),
           _key('|', () => _send('|')),
           _key('~', () => _send('~')),
           _key('/', () => _send('/')),
@@ -533,20 +571,19 @@ class _TerminalViewState extends State<_TerminalView> {
     );
   }
 
-  Future<void> _handleCtrl(String value) async {
+  void _handleCtrl(String value) {
     if (value.isEmpty) return;
     final last = value.codeUnitAt(value.length - 1);
     if (last >= 0x40 && last <= 0x7E) {
-      // Ctrl+letter — send the corresponding control byte (Ctrl+C => 0x03 etc.)
       final code = last & 0x1F;
-      await _send(String.fromCharCode(code));
+      widget.tab.session.write(String.fromCharCode(code));
       widget.tab.input.clear();
-      setState(() => _ctrlMod = false);
     }
+    setState(() => _ctrlMod = false);
   }
 }
 
-/// Strip basic ANSI escape sequences. We render plain text for now — a future
+/// Strip basic ANSI escape sequences. We render plain text for now ÄËĂÂĂÂ a future
 /// pass can wire xterm.js in a WebView for full color support.
 String _stripAnsi(String s) {
   return s

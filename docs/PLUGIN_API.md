@@ -1,60 +1,49 @@
-# Plugin API Reference — XunCode (Android)
+# Plugin API Full Reference — XunCode
 
-XunCode plugins are JavaScript files that run inside the Monaco Editor WebView sandbox. Each plugin calls `VscodePlugin.register()` and receives a `ctx` object with full access to the editor, UI, hooks, storage, and HTTP.
+Complete guide for building and publishing XunCode plugins. This document covers the full lifecycle, every `ctx.*` method, file-system access, terminal integration, examples, limitations, and publishing rules.
 
-> **`xuncode` ≡ `vscode`.** XunCode exposes the same API surface under both `window.vscode` and `window.xuncode`. Existing plugins keep working unchanged; new plugins may use either name.
+> **Plugin API version:** 1.1.0 — corresponds to XunCode app version ≥ 1.1.0
 
 ---
 
 ## Table of Contents
 
-- [Quick Start](#quick-start)
-- [Plugin Manifest](#plugin-manifest)
-- [ctx.editor](#ctxeditor)
-- [ctx.ui](#ctxui)
-- [ctx.hooks](#ctxhooks)
-- [ctx.storage](#ctxstorage)
-- [ctx.http](#ctxhttp)
-- [ctx.terminal](#ctxterminal)
-- [ctx.fs](#ctxfs)
-- [Lifecycle](#lifecycle)
-- [Developer Mode](#developer-mode)
-- [Hosting Your Plugin](#hosting-your-plugin)
-- [Publishing to Marketplace](#publishing-to-marketplace)
-- [Full Examples](#full-examples)
-- [Limitations & Sandbox](#limitations--sandbox)
-- [Changelog](#changelog)
+1. [Lifecycle Overview](#lifecycle-overview)
+2. [Plugin Manifest](#plugin-manifest)
+3. [ctx.editor](#ctxeditor)
+4. [ctx.ui](#ctxui)
+5. [ctx.hooks](#ctxhooks)
+6. [ctx.storage](#ctxstorage)
+7. [ctx.http](#ctxhttp)
+8. [ctx.terminal](#ctxterminal)
+9. [ctx.fs](#ctxfs)
+10. [Publishing & Review](#publishing--review)
+11. [Full Examples](#full-examples)
+12. [Limitations & Sandbox](#limitations--sandbox)
+13. [Changelog](#changelog)
 
 ---
 
-## Quick Start
+## Lifecycle Overview
 
-```js
-VscodePlugin.register({
-  id: 'my-org.my-plugin',
-  name: 'My Plugin',
-  version: '1.0.0',
-  description: 'Does something awesome',
-  author: 'your-github-handle',
-
-  activate(ctx) {
-    ctx.ui.showMessage('My Plugin loaded!');
-
-    ctx.editor.addCommand({
-      id: 'my-plugin.hello',
-      label: 'My Plugin: Say Hello',
-      run() {
-        const sel = ctx.editor.getSelection();
-        ctx.ui.showMessage(sel ? `Selected: ${sel}` : 'No selection');
-      }
-    });
-  },
-
-  deactivate() {
-    // cleanup listeners, timers, etc.
-  }
-});
 ```
+App starts
+  └─ Plugin JS loaded from URL
+       └─ VscodePlugin.register() called
+            └─ activate(ctx) called
+                 ├─ Register commands, hooks, UI items
+                 └─ Plugin is running
+
+User removes plugin
+  └─ deactivate() called
+       └─ Clean up timers, listeners, status-bar items, etc.
+```
+
+**Best practices:**
+- Keep `activate()` fast — don't do heavy work synchronously.
+- Always implement `deactivate()` if you set up timers, intervals, or global listeners.
+- Debounce `onDidChangeContent` — it fires on every keystroke.
+- Use `ctx.storage` for persistence, not `localStorage`.
 
 ---
 
@@ -340,97 +329,15 @@ console.log('Files:', files.join(', '));
 
 ---
 
-## Lifecycle
-
-```
-App starts
-  └─ Plugin JS loaded from URL
-       └─ VscodePlugin.register() called
-            └─ activate(ctx) called
-                 ├─ Register commands
-                 ├─ Register hooks
-                 └─ Plugin is running
-
-User removes plugin
-  └─ deactivate() called
-       └─ Clean up timers, listeners, etc.
-```
-
-**Best practices:**
-- Keep `activate()` fast — don't do heavy work synchronously
-- Always implement `deactivate()` if you set up timers or global listeners
-- Debounce `onDidChangeContent` — it fires on every keystroke
-
----
-
-## Developer Mode
-
-Enable **Developer Mode** in Settings to test plugins without publishing.
-
-1. Settings → Developer Mode → ON
-2. Settings → Developer → **Load Local Plugin**
-3. Paste your plugin JS code into the text area
-4. Tap **Run** — plugin executes immediately in the editor sandbox
-5. Errors appear in the developer console output below
-
-**Tips for development:**
-- Use `console.log()` — output appears in the developer console
-- You can reload the plugin by pasting and running again
-- Test with different file types to verify language detection
-- Test `ctx.http` calls with a real API before publishing
-
----
-
-## Hosting Your Plugin
-
-Your plugin must be hosted at a publicly accessible URL that serves the JS file with CORS headers.
-
-### Option 1: GitHub Raw (easiest)
-
-1. Create a public GitHub repo
-2. Add your `plugin.js` file
-3. Use the raw URL: `https://raw.githubusercontent.com/user/repo/main/plugin.js`
-
-> GitHub raw URLs already have CORS headers — no extra config needed.
-
-### Option 2: Vercel (recommended for production)
-
-1. Create a Next.js or static project
-2. Put your plugin in `public/plugin.js`
-3. Add `vercel.json` for CORS:
-
-```json
-{
-  "headers": [
-    {
-      "source": "/plugin.js",
-      "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" }
-      ]
-    }
-  ]
-}
-```
-
-4. Deploy: `vercel --prod`
-5. Your plugin URL: `https://your-project.vercel.app/plugin.js`
-
-### Option 3: jsDelivr CDN
-
-If your plugin is on GitHub, jsDelivr serves it with CORS automatically:
-`https://cdn.jsdelivr.net/gh/user/repo@main/plugin.js`
-
----
-
-## Publishing to Marketplace
+## Publishing & Review
 
 Once your plugin is hosted and tested:
 
-1. Go to **[vscodemobile-market.vercel.app/submit](https://vscodemobile-market.vercel.app/submit)**
+1. Go to **[xuncode-market.vercel.app/submit](https://xuncode-market.vercel.app/submit)** (or your custom marketplace URL)
 2. Fill in the submission form:
    - Plugin name, description, version
    - Author name / GitHub handle
-   - Category: `AI / Assistant` | `Formatter` | `Language Support` | `Theme` | `Git` | `Utility`
+   - Category: `AI / Assistant` | `Formatter` | `Language Support` | `Theme` | `Git` | `Utility` | `Terminal`
    - Tags (comma-separated)
    - Install URL (the raw JS URL)
    - GitHub repo URL (optional but recommended)
@@ -445,6 +352,7 @@ Once your plugin is hosted and tested:
 - Must use `VscodePlugin.register()` correctly
 - Description must be accurate
 - File size under 500KB
+- `ctx.fs` must not attempt to escape the project directory
 
 ---
 
@@ -572,6 +480,37 @@ VscodePlugin.register({
 });
 ```
 
+### Terminal File Explorer
+
+```js
+VscodePlugin.register({
+  id: 'example.term-explorer',
+  name: 'Terminal Explorer',
+  version: '1.0.0',
+  description: 'List files via terminal and open them in editor',
+  author: 'example',
+
+  activate(ctx) {
+    ctx.editor.addCommand({
+      id: 'term-explorer.list',
+      label: 'Terminal Explorer: List Files',
+      async run() {
+        await ctx.terminal.clear();
+        await ctx.terminal.write('ls -la /home/user\n');
+      }
+    });
+
+    ctx.terminal.onOutput((data) => {
+      // Parse terminal output and offer quick-pick for file names
+      const files = data.split(/\s+/).filter(s => s.includes('.'));
+      if (files.length > 0) {
+        ctx.ui.showMessage(`Found ${files.length} files in terminal output`);
+      }
+    });
+  }
+});
+```
+
 ---
 
 ## Limitations & Sandbox
@@ -581,7 +520,7 @@ Plugins run inside the Monaco WebView sandbox. The following are **not available
 | Not available | Reason |
 |---|---|
 | `require()` / `import` | No Node.js, no module system |
-| `fs`, `path`, `os` | No filesystem access |
+| `fs`, `path`, `os` | No direct filesystem access (use `ctx.fs` instead) |
 | `fetch()` directly | Use `ctx.http` instead (Tor-aware) |
 | DOM manipulation outside editor | Sandboxed WebView |
 | Native Android APIs | Use the Flutter bridge via `ctx.http` |
@@ -597,6 +536,47 @@ Plugins run inside the Monaco WebView sandbox. The following are **not available
 
 ---
 
+## Hosting Your Plugin
+
+Your plugin must be hosted at a publicly accessible URL that serves the JS file with CORS headers.
+
+### Option 1: GitHub Raw (easiest)
+
+1. Create a public GitHub repo
+2. Add your `plugin.js` file
+3. Use the raw URL: `https://raw.githubusercontent.com/user/repo/main/plugin.js`
+
+> GitHub raw URLs already have CORS headers — no extra config needed.
+
+### Option 2: Vercel (recommended for production)
+
+1. Create a Next.js or static project
+2. Put your plugin in `public/plugin.js`
+3. Add `vercel.json` for CORS:
+
+```json
+{
+  "headers": [
+    {
+      "source": "/plugin.js",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" }
+      ]
+    }
+  ]
+}
+```
+
+4. Deploy: `vercel --prod`
+5. Your plugin URL: `https://your-project.vercel.app/plugin.js`
+
+### Option 3: jsDelivr CDN
+
+If your plugin is on GitHub, jsDelivr serves it with CORS automatically:
+`https://cdn.jsdelivr.net/gh/user/repo@main/plugin.js`
+
+---
+
 ## Support & Community
 
 - GitHub: [@H4F8](https://github.com/H4F8) — open issues and PRs here
@@ -606,6 +586,13 @@ Plugins run inside the Monaco WebView sandbox. The following are **not available
 ---
 
 ## Changelog
+
+### v1.1.0
+- Added `ctx.terminal` API (`write`, `clear`, `onOutput`)
+- Added `ctx.fs` API (`read`, `write`, `readdir`)
+- Improved terminal batching and debounce on Android 10+
+- AXS binary now loads from `libaxs.so` in `nativeLibraryDir` (noexec bypass)
+- WebSocket handshake stabilized via `WebSocket.connect()`
 
 ### v1.0.0
 - Initial plugin API release
