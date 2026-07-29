@@ -4,7 +4,7 @@
 use portable_pty::{CommandBuilder, NativePtySystem, PtyPair, PtySize, PtySystem};
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
-use tauri::{Manager, State};
+use tauri::State;
 
 struct AppState {
     pty: Arc<Mutex<Option<PtyPair>>>,
@@ -29,14 +29,14 @@ async fn pty_create(
     let cmd = CommandBuilder::new("/bin/sh");
     pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
 
-    let mut lock = state.pty.lock().map_err(|e| e.to_string())?;
+    let lock = state.pty.lock().map_err(|e| e.to_string())?;
     *lock = Some(pair);
     Ok(())
 }
 
 #[tauri::command]
 async fn pty_write(state: State<'_, AppState>, data: String) -> Result<(), String> {
-    let mut lock = state.pty.lock().map_err(|e| e.to_string())?;
+    let lock = state.pty.lock().map_err(|e| e.to_string())?;
     if let Some(ref pair) = *lock {
         let mut writer = pair.master.take_writer().map_err(|e| e.to_string())?;
         writer.write_all(data.as_bytes()).map_err(|e| e.to_string())?;
@@ -47,7 +47,7 @@ async fn pty_write(state: State<'_, AppState>, data: String) -> Result<(), Strin
 
 #[tauri::command]
 async fn pty_read(state: State<'_, AppState>) -> Result<String, String> {
-    let mut lock = state.pty.lock().map_err(|e| e.to_string())?;
+    let lock = state.pty.lock().map_err(|e| e.to_string())?;
     if let Some(ref pair) = *lock {
         let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
         drop(lock); // release mutex while blocking on read
@@ -63,7 +63,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_store::init())
+        .plugin(tauri_plugin_store::Builder::new().build())
         .manage(AppState {
             pty: Arc::new(Mutex::new(None)),
         })
