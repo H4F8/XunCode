@@ -23,8 +23,8 @@ android {
         buildConfig true
     }
     namespace "com.xunkal1.xuncode"
-    compileSdkVersion 35
-    ndkVersion "25.1.8937393"
+    compileSdkVersion 36
+    ndkVersion "28.2.13676358"
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -42,7 +42,7 @@ android {
     defaultConfig {
         applicationId "com.xunkal1.xuncode"
         minSdkVersion 26
-        targetSdkVersion 35
+        targetSdkVersion 36
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
         resValue "string", "app_name", "XunCode"
