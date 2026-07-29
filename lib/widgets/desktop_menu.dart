@@ -24,7 +24,7 @@ class DesktopMenuBar extends StatelessWidget {
   final VoidCallback onAbout;
   final VoidCallback onReloadPlugins;
 
-  const DesktopMenuBar({
+  DesktopMenuBar({
     super.key,
     required this.onNewProject,
     required this.onOpenFile,
@@ -40,8 +40,7 @@ class DesktopMenuBar extends StatelessWidget {
     required this.onReloadPlugins,
   });
 
-  final bool _isMacOS = PlatformInfo.isMacOS;
-  String get _shortcutMeta => _isMacOS ? 'Cmd' : 'Ctrl';
+  String get _shortcutMeta => PlatformInfo.isMacOS ? 'Cmd' : 'Ctrl';
 
   @override
   Widget build(BuildContext context) {
