@@ -12,6 +12,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'file_service.dart';
 
+const _kEmbeddedRootfsAsset = 'assets/rootfs/';
+
 /// Платформо-зависимый терминальный мост.
 ///
 /// На Android используется AXS (Acode eXecution Server) + proot + Alpine Linux
@@ -212,7 +214,82 @@ class TerminalBridge {
     await prefs.setBool('alpine.installed', true);
   }
 
-  /// Скачивает Alpine minirootfs при первом запуске (Android only).
+  /// Возвращает true, если в assets встроен rootfs.
+  static Future<bool> hasEmbeddedRootfs() async {
+    try {
+      final manifest = await rootBundle.loadString('$_kEmbeddedRootfsAsset/manifest.json');
+      final json = jsonDecode(manifest) as Map<String, dynamic>;
+      return json['arch']?.toString().isNotEmpty ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Распаковывает встроенный в assets rootfs в рабочую директорию приложения.
+  static Future<void> extractEmbeddedRootfs(
+    void Function(double progress, String stage)? onProgress,
+  ) async {
+    if (_isDesktop) return;
+    final root = await rootfsPath();
+    final rootDir = Directory(root);
+    if (!await rootDir.exists()) await rootDir.create(recursive: true);
+
+    // Если уже есть /bin/sh — не распаковываем повторно.
+    if (await File('$root/bin/sh').exists()) {
+      await markAlpineInstalled();
+      return;
+    }
+
+    onProgress?.call(0.0, 'Extracting Alpine');
+
+    // AssetManifest не всегда содержит каждый файл отдельно, поэтому
+    // используем бинарный tar.gz, встроенный как единый asset.
+    final bytes = await rootBundle.load('$_kEmbeddedRootfsAsset/rootfs.tar.gz');
+    final tmpRoot = Directory(FileService.tmpDir);
+    if (!await tmpRoot.exists()) await tmpRoot.create(recursive: true);
+    final gzPath = '${tmpRoot.path}/embedded-rootfs.tar.gz';
+    final tarPath = '${tmpRoot.path}/embedded-rootfs.tar';
+    await File(gzPath).writeAsBytes(bytes.buffer.asUint8List());
+
+    final input = InputFileStream(gzPath);
+    final output = OutputFileStream(tarPath);
+    try {
+      GZipDecoder().decodeStream(input, output);
+    } finally {
+      await input.close();
+      await output.close();
+    }
+
+    final tarStream = InputFileStream(tarPath);
+    try {
+      final archive = TarDecoder().decodeBuffer(tarStream);
+      final total = archive.length;
+      var done = 0;
+      for (final entry in archive) {
+        final outPath = '$root/${entry.name}';
+        if (entry.isFile) {
+          final f = File(outPath);
+          await f.parent.create(recursive: true);
+          await f.writeAsBytes(entry.content as List<int>, flush: false);
+        } else {
+          await Directory(outPath).create(recursive: true);
+        }
+        done++;
+        if (done % 200 == 0) {
+          onProgress?.call(done / total, 'Extracting Alpine');
+        }
+      }
+      onProgress?.call(1.0, 'Extracting Alpine');
+    } finally {
+      await tarStream.close();
+    }
+
+    await _silent(() => File(gzPath).delete());
+    await _silent(() => File(tarPath).delete());
+    await markAlpineInstalled();
+  }
+
+  /// Установка Alpine: сначала пробуем встроенный tar.gz, иначе качаем из сети.
   static Future<void> installAlpine({
     void Function(double progress, String stage)? onProgress,
     CancelToken? cancelToken,
@@ -224,17 +301,22 @@ class TerminalBridge {
     }
     if (await isAlpineInstalled()) return;
 
+    if (await hasEmbeddedRootfs()) {
+      await extractEmbeddedRootfs(onProgress);
+      return;
+    }
+
+    await _downloadAndExtractRootfs(onProgress, cancelToken);
+  }
+
+  /// Скачивает Alpine minirootfs из интернета (fallback).
+  static Future<void> _downloadAndExtractRootfs(
+    void Function(double progress, String stage)? onProgress,
+    CancelToken? cancelToken,
+  ) async {
     final root = await rootfsPath();
     final rootDir = Directory(root);
     if (!await rootDir.exists()) await rootDir.create(recursive: true);
-
-    final hasBin = await Directory('$root/bin').exists();
-    final hasEtc = await Directory('$root/etc').exists();
-    if (hasBin || hasEtc) {
-      onProgress?.call(1.0, 'Found existing rootfs');
-      await markAlpineInstalled();
-      return;
-    }
 
     final arch = _alpineArch();
     final url = 'https://dl-cdn.alpinelinux.org/alpine/v3.20/releases/$arch/'

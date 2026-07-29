@@ -156,7 +156,9 @@ class TerminalSession(
             // LD_LIBRARY_PATH нужен чтобы proot нашёл libtalloc.so.
             // На Android 8 (API 26) иногда не отрабатывает -0, поэтому
             // дополнительно делаем fallback на /system/bin/sh.
-            val pb = ProcessBuilder(
+            // root-флейвор: эмулируем root внутри proot, даём полный PATH.
+            // nonroot-флейвор: обычный user-space proot.
+            val args = if (BuildConfig.ROOT_FLAVOR) mutableListOf(
                 proot.absolutePath,
                 "-r", rootfs.absolutePath,
                 "-w", "/root",
@@ -165,8 +167,19 @@ class TerminalSession(
                 "-b", "/proc/self/fd:/dev/fd",
                 "-b", "$shared:/sdcard/XunCode",
                 "-b", "$shared:/home/user",
-                "-0", "/bin/sh", "-l",
+                "-0", "root", "-w", "/root", "/bin/sh", "-l",
+            ) else mutableListOf(
+                proot.absolutePath,
+                "-r", rootfs.absolutePath,
+                "-w", "/home/user",
+                "-b", "/dev", "-b", "/proc", "-b", "/sys",
+                "-b", "/dev/urandom:/dev/random",
+                "-b", "/proc/self/fd:/dev/fd",
+                "-b", "$shared:/sdcard/XunCode",
+                "-b", "$shared:/home/user",
+                "/bin/sh", "-l",
             )
+            val pb = ProcessBuilder(args)
             pb.environment().apply {
                 put("HOME", "/root")
                 put("TERM", "xterm-256color")

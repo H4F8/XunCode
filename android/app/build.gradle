@@ -17,9 +17,13 @@ if (flutterVersionName == null) flutterVersionName = '1.0'
 
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
+apply plugin: 'kotlin-kapt'
 apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
 
 android {
+    buildFeatures {
+        buildConfig true
+    }
     namespace "com.xunkal1.xuncode"
     compileSdkVersion 35
     ndkVersion "25.1.8937393"
@@ -51,6 +55,25 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    flavorDimensions += "terminal"
+
+    productFlavors {
+        nonroot {
+            dimension "terminal"
+            applicationIdSuffix ".nonroot"
+            versionNameSuffix "-nonroot"
+            resValue "string", "app_name", "XunCode"
+            buildConfigField "boolean", "ROOT_FLAVOR", "false"
+        }
+        root {
+            dimension "terminal"
+            applicationIdSuffix ".root"
+            versionNameSuffix "-root"
+            resValue "string", "app_name", "XunCode Root"
+            buildConfigField "boolean", "ROOT_FLAVOR", "true"
         }
     }
 }

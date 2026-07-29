@@ -50,15 +50,21 @@ XunCode is a native, cross-platform code editor that brings a desktop-like editi
 
 | Platform | Minimum version |
 |----------|-----------------|
-| Android  | API 26 (Android 8.0) |
-| Linux    | 64-bit GTK-based desktop |
+| Android non-root | API 26 (Android 8.0), user-space proot + Alpine |
+| Android root     | API 26+, emulated root inside proot, extended tools |
+| Linux            | 64-bit GTK-based desktop |
 | Flutter  | 3.24.5 or newer |
 | Dart     | 3.3.0 or newer |
 
 ## Install
 
 ### Android
-Download the latest APK from [GitHub Releases](https://github.com/H4F8/XunCode/releases) or grab a CI artifact from the [Actions tab](https://github.com/H4F8/XunCode/actions).
+Two APK variants are published:
+
+- **`xuncode-*-nonroot-release.apk`** — works on any Android 8+ device. It runs a user-space Alpine Linux environment through proot. No root access on the device is required.
+- **`xuncode-*-root-release.apk`** — same engine, but the Alpine environment starts as emulated `root` inside proot. Useful for tools that expect root privileges, package managers, and broader filesystem access inside the sandbox.
+
+Download the latest APKs from [GitHub Releases](https://github.com/H4F8/XunCode/releases) or grab CI artifacts from the [Actions tab](https://github.com/H4F8/XunCode/actions).
 
 ### Linux
 Releases are published as AppImage, `.deb`, `.rpm`, and portable tar archives on the [releases page](https://github.com/H4F8/XunCode/releases).
@@ -72,14 +78,19 @@ cd XunCode
 # Bundle Monaco Editor assets
 npm install && npm run build:monaco
 
+# (Optional) Bundle Alpine rootfs into the APK
+# Skip this to let the app download rootfs on first launch.
+./scripts/bundle-rootfs.sh aarch64
+
 # Fetch Flutter dependencies
 flutter pub get
 
 # Generate launcher icons
-flutter pub run flutter_launcher_icons
+dart run flutter_launcher_icons
 
-# Android debug APK
-flutter build apk --debug
+# Android debug APKs — pick a flavor
+flutter build apk --debug --flavor nonroot
+flutter build apk --debug --flavor root
 
 # Linux release
 flutter build linux --release

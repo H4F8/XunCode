@@ -78,6 +78,14 @@ jobs:
           file assets/axs/axs
           echo "AXS binary ready"
 
+      - name: Bundle Alpine rootfs into APK assets
+        run: |
+          if [ ! -f "assets/rootfs/rootfs.tar.gz" ]; then
+            echo "Rootfs not embedded; downloading for arm64..."
+            ./scripts/bundle-rootfs.sh aarch64
+          fi
+          ls -lh assets/rootfs/rootfs.tar.gz
+
       - name: Install Flutter dependencies
         run: flutter pub get
 
@@ -87,30 +95,42 @@ jobs:
       - name: Analyze Dart sources
         run: flutter analyze --no-fatal-infos
 
-      - name: Build debug APK
-        run: flutter build apk --debug
+      - name: Build debug APKs (nonroot + root)
+        run: |
+          flutter build apk --debug --flavor nonroot
+          cp build/app/outputs/flutter-apk/app-debug.apk build/app/outputs/flutter-apk/app-nonroot-debug.apk
+          flutter build apk --debug --flavor root
+          cp build/app/outputs/flutter-apk/app-debug.apk build/app/outputs/flutter-apk/app-root-debug.apk
 
-      - name: Upload debug APK
+      - name: Upload debug APKs
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-${{ github.sha }}
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          path: |
+            build/app/outputs/flutter-apk/app-nonroot-debug.apk
+            build/app/outputs/flutter-apk/app-root-debug.apk
           retention-days: 14
 
-      - name: Build release APK
+      - name: Build release APKs
         if: startsWith(github.ref, 'refs/tags/')
-        run: flutter build apk --release
+        run: |
+          flutter build apk --release --flavor nonroot
+          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/app-nonroot-release.apk
+          flutter build apk --release --flavor root
+          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/app-root-release.apk
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      - name: Upload release APK
+      - name: Upload release APKs
         if: startsWith(github.ref, 'refs/tags/')
         uses: actions/upload-artifact@v4
         with:
           name: app-release-${{ github.sha }}
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: |
+            build/app/outputs/flutter-apk/app-nonroot-release.apk
+            build/app/outputs/flutter-apk/app-root-release.apk
           retention-days: 30
 
   # ── Linux build ───────────────────────────────────────────────────────────
@@ -143,6 +163,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/android/app-release.apk
-            artifacts/linux/xuncode-*.tar.gz
+            artifacts/android/app-nonroot-release.apk
+            artifacts/android/app-root-release.apk
           generate_release_notes: true

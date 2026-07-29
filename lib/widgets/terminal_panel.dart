@@ -38,15 +38,17 @@ class _TerminalPanelState extends State<TerminalPanel> with TickerProviderStateM
   Future<void> _bootstrap() async {
     final installed = await TerminalBridge.isAlpineInstalled();
     if (!installed) {
-      // Сразу открываем системный shell параллельно с попыткой установки Alpine.
-      // Пользователь получает работающий терминал, не дожидаясь загрузки 3 МБ.
-      await _newTab(unsandboxed: true);
-      // Фоном пытаемся установить Alpine для будущих вкладок.
-      _installAlpine();
+      // Если rootfs встроен в APK — распаковываем его и сразу открываем Alpine.
+      // Иначе открываем ограниченный shell параллельно с загрузкой.
+      if (await TerminalBridge.hasEmbeddedRootfs()) {
+        _installAlpine();
+        await _newTab();
+      } else {
+        await _newTab(unsandboxed: true);
+        _installAlpine();
+      }
       return;
     }
-    await _newTab();
-  }
     await _newTab();
   }
 
