@@ -20,6 +20,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
   String _query = '';
   String? _selectedTag;
   String _sortBy = 'popular'; // popular | rating | recent | name
+  String _platformFilter = 'android'; // all | android | desktop
   final _searchCtrl = TextEditingController();
   late final AnimationController _fadeCtrl;
 
@@ -28,6 +29,12 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
     ('rating', 'Top rated'),
     ('recent', 'Recently updated'),
     ('name', 'Name (A–Z)'),
+  ];
+
+  static const _platformOptions = [
+    ('android', 'Android'),
+    ('desktop', 'Desktop'),
+    ('all', 'All'),
   ];
 
   @override
@@ -129,7 +136,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
   List<Plugin> get _filtered {
     var list = _plugins.where((p) {
       if (_selectedTag != null && !p.tags.contains(_selectedTag)) return false;
-      return true;
+      if (_platformFilter == 'all') return true;
+      return p.platforms.contains(_platformFilter) || p.platforms.contains('all');
     }).toList();
     switch (_sortBy) {
       case 'rating':
@@ -315,31 +323,65 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
     return SliverToBoxAdapter(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.sort, size: 14, color: VscodeTheme.fgMuted),
-            const SizedBox(width: 6),
-            Text('Sort:',
-                style: TextStyle(
-                    color: VscodeTheme.fgMuted, fontSize: 11)),
-            const SizedBox(width: 6),
-            Expanded(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: _sortOptions.map((opt) {
-                    final active = _sortBy == opt.$1;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: _Pill(
-                        label: opt.$2,
-                        active: active,
-                        onTap: () => setState(() => _sortBy = opt.$1),
-                      ),
-                    );
-                  }).toList(),
+            Row(
+              children: [
+                const Icon(Icons.sort, size: 14, color: VscodeTheme.fgMuted),
+                const SizedBox(width: 6),
+                Text('Sort:',
+                    style: TextStyle(
+                        color: VscodeTheme.fgMuted, fontSize: 11)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: _sortOptions.map((opt) {
+                        final active = _sortBy == opt.$1;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: _Pill(
+                            label: opt.$2,
+                            active: active,
+                            onTap: () => setState(() => _sortBy = opt.$1),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
                 ),
-              ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.devices, size: 14, color: VscodeTheme.fgMuted),
+                const SizedBox(width: 6),
+                Text('Platform:',
+                    style: TextStyle(
+                        color: VscodeTheme.fgMuted, fontSize: 11)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: _platformOptions.map((opt) {
+                        final active = _platformFilter == opt.$1;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: _Pill(
+                            label: opt.$2,
+                            active: active,
+                            onTap: () => setState(() => _platformFilter = opt.$1),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -637,27 +679,38 @@ class _PluginCard extends StatelessWidget {
                     color: VscodeTheme.fgLabel, fontSize: 12, height: 1.4),
               ),
             ),
-            if (plugin.tags.isNotEmpty) ...[
+            if (plugin.tags.isNotEmpty || plugin.platforms.isNotEmpty) ...[
               const SizedBox(height: 6),
               Wrap(
                 spacing: 4,
                 runSpacing: 4,
-                children: plugin.tags
-                    .take(3)
-                    .map((t) => Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: VscodeTheme.bgInput,
-                            borderRadius: BorderRadius.circular(8),
-                            border:
-                                Border.all(color: VscodeTheme.border),
-                          ),
-                          child: Text(t,
-                              style: const TextStyle(
-                                  color: VscodeTheme.fgMuted, fontSize: 10)),
-                        ))
-                    .toList(),
+                children: [
+                  ...plugin.platforms.take(2).map((p) => Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: VscodeTheme.accent.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: VscodeTheme.accent.withOpacity(0.4)),
+                        ),
+                        child: Text(p,
+                            style: const TextStyle(
+                                color: VscodeTheme.accent, fontSize: 10)),
+                      )),
+                  ...plugin.tags.take(3).map((t) => Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: VscodeTheme.bgInput,
+                          borderRadius: BorderRadius.circular(8),
+                          border:
+                              Border.all(color: VscodeTheme.border),
+                        ),
+                        child: Text(t,
+                            style: const TextStyle(
+                                color: VscodeTheme.fgMuted, fontSize: 10)),
+                      )),
+                ],
               ),
             ],
             const SizedBox(height: 8),

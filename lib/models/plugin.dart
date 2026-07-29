@@ -10,6 +10,7 @@ class Plugin {
   final int downloads;
   final String? icon;
   final List<String> tags;
+  final List<String> platforms;
 
   const Plugin({
     required this.id,
@@ -23,6 +24,7 @@ class Plugin {
     this.downloads = 0,
     this.icon,
     this.tags = const [],
+    this.platforms = const ['android'],
   });
 
   factory Plugin.fromJson(Map<String, dynamic> j) => Plugin(
@@ -39,6 +41,9 @@ class Plugin {
         tags: (j['tags'] is List)
             ? (j['tags'] as List).map((e) => e.toString()).toList()
             : const [],
+        platforms: (j['platforms'] is List)
+            ? (j['platforms'] as List).map((e) => e.toString()).toList()
+            : const ['android'],
       );
 
   Map<String, dynamic> toJson() => {
@@ -53,6 +58,7 @@ class Plugin {
         'downloads': downloads,
         'icon': icon,
         'tags': tags,
+        'platforms': platforms,
       };
 }
 
