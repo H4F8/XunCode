@@ -114,65 +114,16 @@ jobs:
           retention-days: 30
 
   # ── Linux build ───────────────────────────────────────────────────────────
-  linux:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Linux build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
-            libstdc++-12-dev curl file tar gzip
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: 'stable'
-          cache: true
-
-      - name: Enable Linux desktop
-        run: flutter config --enable-linux-desktop
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install npm deps and bundle Monaco Editor
-        run: npm install && npm run build:monaco
-
-      - name: Generate Flutter managed files for Linux
-        run: flutter create --platforms=linux . --project-name=xuncode
-
-      - name: Install Flutter dependencies
-        run: flutter pub get
-
-      - name: Analyze Dart sources
-        run: flutter analyze --no-fatal-infos
-
-      - name: Build Linux release
-        run: flutter build linux --release
-
-      - name: Package portable tar
-        run: |
-          VERSION=${GITHUB_REF_NAME:-dev}
-          OUT_DIR="build/linux/x64/release/bundle"
-          mkdir -p dist
-          tar -czf "dist/xuncode-${VERSION}-linux-x64.tar.gz" -C "$OUT_DIR" .
-
-      - name: Upload Linux bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: xuncode-linux-${{ github.sha }}
-          path: dist/xuncode-*.tar.gz
-          retention-days: 14
+  # NOTE: Disabled until the `linux/` directory with Flutter-managed files is
+  # committed from a local Flutter installation. The Android build is the
+  # priority for now.
+  # linux:
+  #   runs-on: ubuntu-latest
+  #   ...
 
   # ── GitHub Release ────────────────────────────────────────────────────────
   release:
-    needs: [android, linux]
+    needs: [android]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
