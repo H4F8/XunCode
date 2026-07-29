@@ -51,16 +51,12 @@ jobs:
       - name: Build Tauri app
         run: cargo tauri build --target x86_64-unknown-linux-gnu
 
-      - name: Upload Linux tarball
+      - name: Upload desktop bundles
         uses: actions/upload-artifact@v4
         with:
-          name: xuncode-desktop-linux-${{ github.sha }}
-          path: desktop/src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/**/*.tar.gz
-          retention-days: 14
-
-      - name: Upload AppImage
-        uses: actions/upload-artifact@v4
-        with:
-          name: xuncode-desktop-appimage-${{ github.sha }}
-          path: desktop/src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/**/*.AppImage
+          name: xuncode-desktop-${{ github.sha }}
+          path: |
+            desktop/src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/**/*.deb
+            desktop/src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/**/*.rpm
+            desktop/src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/**/*.AppImage
           retention-days: 14
