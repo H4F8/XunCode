@@ -75,6 +75,9 @@ class TerminalBridge {
             '/data/app/com.xunkal1.xuncode/lib/arm64';
     final prootBin = '$nativeDir/libproot.so';
 
+    // AXS не всегда стартует стабильно на Android 8/10/12: иногда бинарник
+    // падает сразу, иногда не пишет порт. Если порт не получен — бросаем
+    // ошибку, и вызывающий код должен упасть обратно на системный shell.
     _axsProcess = await Process.start(axs.path, [
       '-p', '0',
       '-c', '/bin/sh',
@@ -99,12 +102,29 @@ class TerminalBridge {
       return _axsPort;
     });
 
+    final stderrFuture = _axsProcess!.stderr
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())
+        .first
+        .then((line) => line)
+        .catchError((_) => '');
+
     try {
-      await Future.any([
-        portFuture,
+      final result = await Future.any([
+        Future.wait([portFuture, stderrFuture]),
         Future.delayed(
             _axsTimeout, () => throw TimeoutException('AXS start timeout')),
       ]);
+      if (result is List) {
+        final port = result[0] as int?;
+        final err = result[1] as String?;
+        if (port == null || port <= 0) {
+          _axsProcess?.kill();
+          _axsProcess = null;
+          _axsPort = null;
+          throw Exception('AXS did not report a port${err?.isNotEmpty == true ? ": $err" : ""}');
+        }
+      }
     } catch (_) {
       _axsProcess?.kill();
       _axsProcess = null;
@@ -139,7 +159,12 @@ class TerminalBridge {
         final root = await rootfsPath();
         if (root.isNotEmpty) {
           final marker = File('$root/.installed');
-          if (await marker.exists()) return true;
+          if (await marker.exists()) {
+            // Проверим, что /bin/sh реально существует — иногда маркер есть,
+            // а rootfs побит.
+            final binSh = File('$root/bin/sh');
+            if (await binSh.exists()) return true;
+          }
           final dir = Directory(root);
           if (await dir.exists() && await _hasContent(dir)) {
             await marker.writeAsString('ok');
@@ -321,8 +346,18 @@ class TerminalBridge {
       } else {
         await session._open();
       }
-    } catch (_) {
+    } catch (e) {
       await session.kill();
+      // На Android 8/10 AXS часто падает. Пробуем нативный системный shell.
+      if (!_isDesktop) {
+        try {
+          final fallback = TerminalSession._('${id}_fallback', cols, rows);
+          await fallback._openUnsandboxed();
+          fallback._output.add('[warning] proot/AXS failed: $e\n');
+          fallback._output.add('[warning] using limited Android shell fallback.\n');
+          return fallback;
+        } catch (_) {}
+      }
       rethrow;
     }
     return session;
@@ -545,17 +580,17 @@ class TerminalSession {
   }
 
   Future<WebSocket> _connectWs(int port) async {
-    const maxAttempts = 3;
-    WebSocketException? lastError;
+    const maxAttempts = 5;
+    Exception? lastError;
     for (var attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         return await WebSocket.connect(
           'ws://127.0.0.1:$port/terminals/new',
         ).timeout(const Duration(seconds: 5));
-      } on WebSocketException catch (e) {
+      } on Exception catch (e) {
         lastError = e;
         if (attempt < maxAttempts) {
-          await Future.delayed(Duration(milliseconds: 200 * attempt));
+          await Future.delayed(Duration(milliseconds: 300 * attempt));
         }
       }
     }

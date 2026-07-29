@@ -151,8 +151,11 @@ class TerminalSession(
         return try {
             val shared = service.sharedDir().absolutePath
             val libDir = service.prootLibDir()
+            val tmpDir = File(service.appDataDir(), "tmp").apply { mkdirs() }
 
-            // LD_LIBRARY_PATH нужен чтобы proot нашёл libtalloc.so
+            // LD_LIBRARY_PATH нужен чтобы proot нашёл libtalloc.so.
+            // На Android 8 (API 26) иногда не отрабатывает -0, поэтому
+            // дополнительно делаем fallback на /system/bin/sh.
             val pb = ProcessBuilder(
                 proot.absolutePath,
                 "-r", rootfs.absolutePath,
@@ -171,7 +174,7 @@ class TerminalSession(
                 put("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
                 put("LANG", "C.UTF-8")
                 put("LD_LIBRARY_PATH", libDir)
-                put("PROOT_TMP_DIR", File(service.appDataDir(), "tmp").absolutePath)
+                put("PROOT_TMP_DIR", tmpDir.absolutePath)
                 put("XUNCODE_HOME", "/sdcard/XunCode")
             }
             pb.redirectErrorStream(true)
@@ -179,6 +182,15 @@ class TerminalSession(
             val p = pb.start()
             process = p
             writer = p.outputStream
+
+            // На старых Android proot может молча упасть — проверяем,
+            // что процесс жив хотя бы 300 мс, иначе fallback.
+            Thread.sleep(300)
+            if (!p.isAlive) {
+                val exit = try { p.exitValue() } catch (_: Throwable) { -1 }
+                emit("[terminal] proot exited early (code $exit), using limited shell\n")
+                return startSystemSh()
+            }
 
             readerThread = Thread({ pumpOutput(p) }, "term-$id-reader").apply { isDaemon = true; start() }
             "ok"
@@ -190,8 +202,9 @@ class TerminalSession(
     private fun startSystemSh(): String {
         return try {
             val home = service.appExternalHome()
-            val pb = ProcessBuilder("/system/bin/sh")
-            pb.directory(File(home))
+            val shellPath = if (java.io.File("/system/bin/sh").exists()) "/system/bin/sh" else "/bin/sh"
+            val pb = ProcessBuilder(shellPath)
+            pb.directory(java.io.File(home))
             pb.environment().apply {
                 put("HOME", home)
                 put("PWD", home)

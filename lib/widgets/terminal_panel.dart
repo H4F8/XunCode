@@ -36,12 +36,17 @@ class _TerminalPanelState extends State<TerminalPanel> with TickerProviderStateM
   }
 
   Future<void> _bootstrap() async {
-    // proot ĂÂĂÂÄšÂĂÂÄšÂĂÂÄšÂĂÂĂÂÄšĹžĂÂĂĹžĂÂĂÂ ĂÂĂÂ APĂÂĂÂ ÄšÂĂÂĂÂĂĹžÄšÂĂÂĂÂĂĹžĂÂĂÂ jniLibs ÄËĂÂĂÂ ÄšÂĂÂĂÂÄšÂĂÂĂÂ°ÄšÂĂÂĂÂĂÂ¸ĂÂĂÂĂÂĂÂ°ĂÂĂÂĂÂĂÂ¸ĂÂĂĹž ĂÂĂÂĂÂĂĹž ÄšÂĂÂÄšÂĂÂĂÂĂĹžĂÂĂÂÄšÂĂÂĂÂĂĹžÄšÂĂÂÄšÂĂÂÄšÂĂÂ
     final installed = await TerminalBridge.isAlpineInstalled();
     if (!installed) {
-      await _installAlpine();
-      if (_installError != null) return;
+      // Сразу открываем системный shell параллельно с попыткой установки Alpine.
+      // Пользователь получает работающий терминал, не дожидаясь загрузки 3 МБ.
+      await _newTab(unsandboxed: true);
+      // Фоном пытаемся установить Alpine для будущих вкладок.
+      _installAlpine();
+      return;
     }
+    await _newTab();
+  }
     await _newTab();
   }
 
@@ -87,20 +92,11 @@ class _TerminalPanelState extends State<TerminalPanel> with TickerProviderStateM
     _cancelToken?.cancel('user cancelled');
   }
 
-  Future<void> _newTab() async {
+  Future<void> _newTab({bool unsandboxed = false}) async {
     final id = 'term-${DateTime.now().microsecondsSinceEpoch}';
-    final session = await TerminalBridge.create(id: id);
-    final tab = _Tab(session: session);
-    setState(() {
-      _tabs.add(tab);
-      _ctrl.dispose();
-      _ctrl = TabController(length: _tabs.length, vsync: this, initialIndex: _tabs.length - 1);
-    });
-  }
-
-  Future<void> _newUnsandboxedTab() async {
-    final id = 'term-${DateTime.now().microsecondsSinceEpoch}';
-    final session = await TerminalBridge.createUnsandboxed(id: id);
+    final session = unsandboxed
+        ? await TerminalBridge.createUnsandboxed(id: id)
+        : await TerminalBridge.create(id: id);
     final tab = _Tab(session: session);
     setState(() {
       _tabs.add(tab);
@@ -204,7 +200,7 @@ class _TerminalPanelState extends State<TerminalPanel> with TickerProviderStateM
             icon: const Icon(Icons.add, size: 16),
             color: VscodeTheme.fgMuted,
             tooltip: lang.tr('terminal.new_shell'),
-            onPressed: _installing ? null : _newTab,
+            onPressed: _installing ? null : () => _newTab(),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
           ),
@@ -299,7 +295,7 @@ class _TerminalPanelState extends State<TerminalPanel> with TickerProviderStateM
                 ),
                 onPressed: () async {
                   setState(() => _installError = null);
-                  await _newUnsandboxedTab();
+                  await _newTab(unsandboxed: true);
                 },
               ),
             ],
@@ -317,7 +313,7 @@ class _TerminalPanelState extends State<TerminalPanel> with TickerProviderStateM
           icon: const Icon(Icons.add, size: 14),
           label: Text(lang.tr('terminal.new_shell'),
               style: const TextStyle(fontSize: 12)),
-          onPressed: _newTab,
+          onPressed: () => _newTab(),
         ),
       );
     }
