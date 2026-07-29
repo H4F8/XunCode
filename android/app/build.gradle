@@ -45,6 +45,7 @@ android {
         targetSdkVersion 35
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
+        resValue "string", "app_name", "XunCode"
     }
 
     buildTypes {
@@ -53,25 +54,6 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-        }
-    }
-
-    flavorDimensions += "terminal"
-
-    productFlavors {
-        nonroot {
-            dimension "terminal"
-            applicationIdSuffix ".nonroot"
-            versionNameSuffix "-nonroot"
-            resValue "string", "app_name", "XunCode"
-            buildConfigField "boolean", "ROOT_FLAVOR", "false"
-        }
-        root {
-            dimension "terminal"
-            applicationIdSuffix ".root"
-            versionNameSuffix "-root"
-            resValue "string", "app_name", "XunCode Root"
-            buildConfigField "boolean", "ROOT_FLAVOR", "true"
         }
     }
 }

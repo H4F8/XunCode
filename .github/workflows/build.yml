@@ -95,42 +95,32 @@ jobs:
       - name: Analyze Dart sources
         run: flutter analyze --no-fatal-infos
 
-      - name: Build debug APKs (nonroot + root)
+      - name: Build debug APK
         run: |
-          flutter build apk --debug --flavor nonroot
-          cp build/app/outputs/flutter-apk/app-debug.apk build/app/outputs/flutter-apk/app-nonroot-debug.apk
-          flutter build apk --debug --flavor root
-          cp build/app/outputs/flutter-apk/app-debug.apk build/app/outputs/flutter-apk/app-root-debug.apk
+          flutter build apk --debug
+          cp build/app/outputs/flutter-apk/app-debug.apk build/app/outputs/flutter-apk/app-debug-renamed.apk
 
-      - name: Upload debug APKs
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-${{ github.sha }}
-          path: |
-            build/app/outputs/flutter-apk/app-nonroot-debug.apk
-            build/app/outputs/flutter-apk/app-root-debug.apk
+          path: build/app/outputs/flutter-apk/app-debug-renamed.apk
           retention-days: 14
 
-      - name: Build release APKs
+      - name: Build release APK
         if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          flutter build apk --release --flavor nonroot
-          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/app-nonroot-release.apk
-          flutter build apk --release --flavor root
-          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/app-root-release.apk
+        run: flutter build apk --release
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      - name: Upload release APKs
+      - name: Upload release APK
         if: startsWith(github.ref, 'refs/tags/')
         uses: actions/upload-artifact@v4
         with:
           name: app-release-${{ github.sha }}
-          path: |
-            build/app/outputs/flutter-apk/app-nonroot-release.apk
-            build/app/outputs/flutter-apk/app-root-release.apk
+          path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
 
   # ── Linux build ───────────────────────────────────────────────────────────
@@ -154,7 +144,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build libgtk-3-dev libblkid-dev liblzma-dev
+          sudo apt-get install -y ninja-build libgtk-3-dev libblkid-dev liblzma-dev libsecret-1-dev
 
       - name: Install npm deps and bundle Monaco Editor
         run: npm install && npm run build:monaco
@@ -209,7 +199,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/android/app-nonroot-release.apk
-            artifacts/android/app-root-release.apk
+            artifacts/android/app-release.apk
             artifacts/linux/xuncode-linux.tar.gz
           generate_release_notes: true
