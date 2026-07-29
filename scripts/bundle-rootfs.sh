@@ -55,8 +55,13 @@ EOF
 touch "$ASSET_DIR/.installed"
 
 # Repack into a single tar.gz asset for efficient extraction.
-rm -f "$ASSET_DIR/../rootfs.tar.gz"
-tar -czf "$ASSET_DIR/rootfs.tar.gz" -C "$ASSET_DIR" .
+# Use a staging dir to avoid "file changed as we read it" when archiving
+# the same directory that contains the output archive.
+STAGE_DIR=$(mktemp -d)
+cp -a "$ASSET_DIR/." "$STAGE_DIR/"
+rm -f "$ASSET_DIR/rootfs.tar.gz"
+tar -czf "$ASSET_DIR/rootfs.tar.gz" -C "$STAGE_DIR" .
+rm -rf "$STAGE_DIR"
 
 rm -rf "$TMP_DIR"
 
