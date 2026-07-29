@@ -69,13 +69,9 @@ class FileService {
     } catch (_) {
       // MethodChannel may not be wired in tests / desktop. Fall back to
       // path_provider so the rest of the app keeps working.
-      try {
-        final ext = await getExternalStorageDirectory();
-        _privateRoot = ext?.path ?? (await getApplicationDocumentsDirectory()).path;
-      } catch (_) {
-        _privateRoot = (await getApplicationDocumentsDirectory()).path;
-      }
-      _sharedRoot ??= '/storage/emulated/0/Shared/XunCode';
+      final docs = await getApplicationDocumentsDirectory();
+      _privateRoot = docs.path;
+      _sharedRoot = '${docs.path}/Shared/XunCode';
       for (final sub in const [
         'plugins', 'cache', 'rootfs', 'proot', 'prefs', 'database', 'logs', 'tmp',
       ]) {

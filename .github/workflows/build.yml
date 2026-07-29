@@ -97,7 +97,7 @@ jobs:
 
       - name: Build debug APK
         run: |
-          flutter build apk --debug
+          flutter build apk --debug --android-skip-build-dependency-validation
           cp build/app/outputs/flutter-apk/app-debug.apk build/app/outputs/flutter-apk/app-debug-renamed.apk
 
       - name: Upload debug APK
@@ -109,7 +109,7 @@ jobs:
 
       - name: Build release APK
         if: startsWith(github.ref, 'refs/tags/')
-        run: flutter build apk --release
+        run: flutter build apk --release --android-skip-build-dependency-validation
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
