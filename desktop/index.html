@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>XunCode</title>
+  <link rel="stylesheet" href="src/styles.css" />
+</head>
+<body>
+  <div id="app" class="app">
+    <aside id="sidebar" class="sidebar">
+      <div class="logo">
+        <span class="logo-icon">X</span>
+        <span class="logo-text">XunCode</span>
+      </div>
+      <nav class="nav">
+        <button class="nav-item active" data-view="editor" data-i18n="nav_editor">Редактор</button>
+        <button class="nav-item" data-view="marketplace" data-i18n="nav_marketplace">Маркетплейс</button>
+        <button class="nav-item" data-view="terminal" data-i18n="nav_terminal">Терминал</button>
+        <button class="nav-item" data-view="settings" data-i18n="nav_settings">Настройки</button>
+      </nav>
+      <div class="sidebar-footer">
+        <span id="platform-badge" class="badge">Desktop</span>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div id="tab-bar" class="tab-bar"></div>
+        <div class="topbar-actions">
+          <button id="new-file-btn" class="icon-btn" title="New file">+</button>
+          <button id="open-file-btn" class="icon-btn" title="Open file">📂</button>
+          <button id="save-file-btn" class="icon-btn" title="Save file">💾</button>
+        </div>
+      </header>
+
+      <section id="view-editor" class="view active">
+        <div id="editor-container" class="editor-container"></div>
+      </section>
+
+      <section id="view-marketplace" class="view">
+        <div class="marketplace-header">
+          <h1 data-i18n="marketplace_title">Маркетплейс плагинов</h1>
+          <div class="marketplace-filters">
+            <button class="filter-chip active" data-filter="all" data-i18n="filter_all">Все</button>
+            <button class="filter-chip" data-filter="desktop" data-i18n="filter_desktop">Desktop</button>
+            <button class="filter-chip" data-filter="android" data-i18n="filter_android">Android</button>
+          </div>
+        </div>
+        <div id="marketplace-grid" class="marketplace-grid"></div>
+      </section>
+
+      <section id="view-terminal" class="view">
+        <div id="terminal-container" class="terminal-container"></div>
+      </section>
+
+      <section id="view-settings" class="view">
+        <div class="settings-container">
+          <h1 data-i18n="settings_title">Настройки</h1>
+
+          <div class="setting-group">
+            <h2 data-i18n="settings_appearance">Внешний вид</h2>
+            <label>
+              <span data-i18n="settings_language">Язык / Language</span>
+              <select id="setting-language">
+                <option value="ru">Русский</option>
+                <option value="en">English</option>
+              </select>
+            </label>
+            <label>
+              <span data-i18n="settings_theme">Тема</span>
+              <select id="setting-theme">
+                <option value="dark">Dark</option>
+                <option value="light">Light</option>
+              </select>
+            </label>
+            <label>
+              <span data-i18n="settings_font_size">Размер шрифта редактора</span>
+              <input id="setting-font-size" type="number" min="8" max="32" value="14" />
+            </label>
+          </div>
+
+          <div class="setting-group">
+            <h2 data-i18n="settings_links">Ссылки</h2>
+            <div class="links-list">
+              <a href="https://github.com/H4F8/XunCode" target="_blank" rel="noopener">GitHub</a>
+              <a href="https://t.me/xuncode" target="_blank" rel="noopener">Telegram канал</a>
+              <a href="https://t.me/xuncode_chat" target="_blank" rel="noopener">Telegram чат</a>
+              <a href="https://boosty.to/xuncode" target="_blank" rel="noopener">Boosty</a>
+            </div>
+          </div>
+
+          <div class="setting-group">
+            <h2 data-i18n="settings_about">О приложении</h2>
+            <p>XunCode Desktop v1.0.0</p>
+            <p data-i18n="settings_about_text">Кроссплатформенный редактор кода с плагинами и терминалом.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
