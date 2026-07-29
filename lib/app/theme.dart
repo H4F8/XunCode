@@ -81,3 +81,66 @@ class VscodeTheme {
     );
   }
 }
+
+/// Extended theme data for light mode and Linux desktop customization.
+/// Keeps the legacy [VscodeTheme] static consts intact while offering
+/// dynamic ThemeData builders for different modes.
+class AppTheme {
+  static const _lightBg = Color(0xFFFFFFFF);
+  static const _lightSidebar = Color(0xFFF3F3F3);
+  static const _lightFg = Color(0xFF333333);
+  static const _lightFgMuted = Color(0xFF6E6E6E);
+  static const _lightBorder = Color(0xFFE5E5E5);
+
+  static ThemeData light() {
+    return ThemeData(
+      brightness: Brightness.light,
+      scaffoldBackgroundColor: _lightBg,
+      colorScheme: const ColorScheme.light(
+        primary: VscodeTheme.accent,
+        secondary: VscodeTheme.accent,
+        surface: _lightSidebar,
+        onSurface: _lightFg,
+        onPrimary: Colors.white,
+      ),
+      textTheme: GoogleFonts.interTextTheme(
+        const TextTheme(
+          bodyMedium: TextStyle(color: _lightFg, fontSize: 13),
+          bodySmall: TextStyle(color: _lightFgMuted, fontSize: 12),
+          labelMedium: TextStyle(
+              color: Color(0xFF616161), fontSize: 11, letterSpacing: 1),
+        ),
+      ),
+      iconTheme: const IconThemeData(color: _lightFgMuted, size: 20),
+      dividerColor: _lightBorder,
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(3),
+          borderSide: const BorderSide(color: _lightBorder),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(3),
+          borderSide: const BorderSide(color: _lightBorder),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(3),
+          borderSide: const BorderSide(color: VscodeTheme.accent),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        hintStyle: const TextStyle(color: _lightFgMuted, fontSize: 13),
+      ),
+      scrollbarTheme: ScrollbarThemeData(
+        thumbColor: WidgetStateProperty.all(const Color(0xFFBDBDBD)),
+        thickness: WidgetStateProperty.all(6),
+      ),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: _lightSidebar,
+        elevation: 0,
+        titleTextStyle: TextStyle(color: _lightFg, fontSize: 13),
+        iconTheme: IconThemeData(color: _lightFgMuted),
+      ),
+    );
+  }
+}

@@ -268,6 +268,7 @@ class PluginSandbox {
           p['key']?.toString() ?? '',
           p['data'] is List<int> ? p['data'] as List<int> : [],
         );
+        return null;
 
       // ── http ────────────────────────────────────────────────────────
       case 'http.get':
@@ -621,16 +622,21 @@ class PluginSandbox {
     final headers = _parseHeaders(p['headers']);
     final req = http.Request('GET', Uri.parse(url));
     req.headers.addAll(headers);
-    final streamed = await http.Client().send(req).timeout(
-      Duration(seconds: (p['timeout'] as num?)?.toInt() ?? 60),
-    );
-    final chunks = <int>[];
-    await for (final chunk in streamed.stream) {
-      chunks.addAll(chunk);
-      // onChunk callback could be invoked here if we had a mechanism
+    final client = http.Client();
+    try {
+      final streamed = await client.send(req).timeout(
+        Duration(seconds: (p['timeout'] as num?)?.toInt() ?? 60),
+      );
+      final chunks = <int>[];
+      await for (final chunk in streamed.stream) {
+        chunks.addAll(chunk);
+        // onChunk callback could be invoked here if we had a mechanism
+      }
+      final body = utf8.decode(chunks);
+      return {'status': streamed.statusCode, 'body': body};
+    } finally {
+      client.close();
     }
-    final body = utf8.decode(chunks);
-    return {'status': streamed.statusCode, 'body': body};
   }
 
   // ─────────────────────────────────────────────────────────────────────────

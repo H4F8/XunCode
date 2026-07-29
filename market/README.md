@@ -87,6 +87,6 @@ Each entry in `plugins.json` looks like:
 
 ## Links
 
-- GitHub: <https://github.com/Hinderchik>
+- GitHub: <https://github.com/H4F8>
 - Telegram Dev: <https://t.me/XunKal1Dev>
 - Telegram: <https://t.me/GodPassTGK>

@@ -36,6 +36,14 @@ class PluginRuntime {
     _showQuickPick = fn;
   }
 
+  void detachUi() {
+    _editor = null;
+    _uiNotifier = null;
+    _openFile = null;
+    _showInputBox = null;
+    _showQuickPick = null;
+  }
+
   Future<String?> Function(String? title, String? placeholder, String? value)? get inputBox => _showInputBox;
   Future<String?> Function(List<String> items, String? title)? get quickPick => _showQuickPick;
 

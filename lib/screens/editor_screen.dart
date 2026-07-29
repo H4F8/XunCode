@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:provider/provider.dart';
 import '../app/theme.dart';
@@ -9,17 +12,44 @@ import '../models/settings_model.dart';
 import '../services/completion_service.dart';
 import '../services/file_service.dart';
 import '../services/language_service.dart';
+import '../services/platform_info.dart';
 import '../services/tor_service.dart';
 import '../services/plugin_runtime.dart';
 import '../services/editor_bridge.dart';
 import '../widgets/activity_bar.dart';
 import '../widgets/command_palette.dart';
+import '../widgets/desktop_menu.dart';
 import '../widgets/sidebar.dart';
 import '../widgets/tab_bar.dart';
 import '../widgets/status_bar.dart';
 import '../widgets/terminal_panel.dart';
+import 'about_screen.dart';
 import 'settings_screen.dart';
 import 'marketplace_screen.dart';
+
+class _SaveIntent extends Intent {
+  const _SaveIntent();
+}
+
+class _SaveAllIntent extends Intent {
+  const _SaveAllIntent();
+}
+
+class _ToggleTerminalIntent extends Intent {
+  const _ToggleTerminalIntent();
+}
+
+class _ToggleSidebarIntent extends Intent {
+  const _ToggleSidebarIntent();
+}
+
+class _CommandPaletteIntent extends Intent {
+  const _CommandPaletteIntent();
+}
+
+class _SettingsIntent extends Intent {
+  const _SettingsIntent();
+}
 
 class EditorScreen extends StatefulWidget {
   const EditorScreen({super.key});
@@ -47,6 +77,14 @@ class _EditorScreenState extends State<EditorScreen> {
     TorService.checkStatus().then((v) {
       if (mounted) setState(() => _torEnabled = v);
     });
+  }
+
+  @override
+  void dispose() {
+    PluginRuntime.instance.detachUi();
+    _editorBridge?.dispose();
+    _webCtrl?.dispose();
+    super.dispose();
   }
 
   void _onActivityBarSelect(ActivityBarItem item) {
@@ -130,26 +168,153 @@ class _EditorScreenState extends State<EditorScreen> {
     final filesModel = context.watch<OpenFilesModel>();
     final settings = context.watch<SettingsModel>();
 
-    return LayoutBuilder(
-      builder: (ctx, constraints) {
-        final isTablet = constraints.maxWidth >= _kTabletBreakpoint;
-        return Scaffold(
-          key: _scaffoldKey,
-          backgroundColor: VscodeTheme.bg,
-          resizeToAvoidBottomInset: true,
-          drawer: isTablet ? null : _PhoneDrawer(
-            activePanel: _activeBar.name,
-            filesModel: filesModel,
-            onFileOpen: _openFile,
+    return Shortcuts(
+      shortcuts: PlatformInfo.isDesktop ? DesktopShortcuts.all : const {},
+      child: Actions(
+        actions: PlatformInfo.isDesktop
+            ? {
+                _SaveIntent: CallbackAction<_SaveIntent>(
+                  onInvoke: (_) {
+                    _saveActive();
+                    return null;
+                  },
+                ),
+                _SaveAllIntent: CallbackAction<_SaveAllIntent>(
+                  onInvoke: (_) {
+                    _saveActive();
+                    return null;
+                  },
+                ),
+                _ToggleTerminalIntent: CallbackAction<_ToggleTerminalIntent>(
+                  onInvoke: (_) {
+                    _toggleTerminal();
+                    return null;
+                  },
+                ),
+                _ToggleSidebarIntent: CallbackAction<_ToggleSidebarIntent>(
+                  onInvoke: (_) {
+                    setState(() => _sidebarVisible = !_sidebarVisible);
+                    return null;
+                  },
+                ),
+                _CommandPaletteIntent: CallbackAction<_CommandPaletteIntent>(
+                  onInvoke: (_) {
+                    showPluginCommandPalette(context);
+                    return null;
+                  },
+                ),
+                _SettingsIntent: CallbackAction<_SettingsIntent>(
+                  onInvoke: (_) {
+                    Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                    return null;
+                  },
+                ),
+              }
+            : {},
+        child: Focus(
+          autofocus: true,
+          child: LayoutBuilder(
+            builder: (ctx, constraints) {
+              final isTablet = constraints.maxWidth >= _kTabletBreakpoint ||
+                  PlatformInfo.isDesktop;
+              return Scaffold(
+                key: _scaffoldKey,
+                backgroundColor: VscodeTheme.bg,
+                resizeToAvoidBottomInset: true,
+                drawer: isTablet || PlatformInfo.isDesktop
+                    ? null
+                    : _PhoneDrawer(
+                        activePanel: _activeBar.name,
+                        filesModel: filesModel,
+                        onFileOpen: _openFile,
+                      ),
+                body: SafeArea(
+                  child: Column(
+                    children: [
+                      if (PlatformInfo.isDesktop)
+                        DesktopMenuBar(
+                          onNewProject: () {},
+                          onOpenFile: _pickAndOpenFile,
+                          onOpenFolder: _pickAndOpenFolder,
+                          onSave: _saveActive,
+                          onSaveAll: _saveActive,
+                          onToggleSidebar: () =>
+                              setState(() => _sidebarVisible = !_sidebarVisible),
+                          onToggleTerminal: _toggleTerminal,
+                          onCommandPalette: () => showPluginCommandPalette(context),
+                          onSettings: () => Navigator.push(context,
+                              MaterialPageRoute(builder: (_) => const SettingsScreen())),
+                          onMarketplace: () => Navigator.push(context,
+                              MaterialPageRoute(builder: (_) => const MarketplaceScreen())),
+                          onAbout: () => Navigator.push(context,
+                              MaterialPageRoute(builder: (_) => const AboutScreen())),
+                          onReloadPlugins: () => PluginRuntime.instance.reloadAll(),
+                        ),
+                      Expanded(
+                        child: isTablet
+                            ? _buildTabletLayout(filesModel, settings)
+                            : _buildPhoneLayout(filesModel, settings),
+                      ),
+                      if (PlatformInfo.isDesktop) _buildDesktopStatusStrip(),
+                    ],
+                  ),
+                ),
+                bottomNavigationBar: isTablet || PlatformInfo.isDesktop
+                    ? null
+                    : _buildPhoneNav(),
+              );
+            },
           ),
-          body: SafeArea(
-            child: isTablet
-                ? _buildTabletLayout(filesModel, settings)
-                : _buildPhoneLayout(filesModel, settings),
-          ),
-          bottomNavigationBar: isTablet ? null : _buildPhoneNav(),
-        );
-      },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickAndOpenFile() async {
+    final f = await FileService.importFile();
+    if (f != null) _openFile(f['path']!, f['name']!, f['content']!);
+  }
+
+  Future<void> _pickAndOpenFolder() async {
+    final path = await FileService.importFolder();
+    if (path != null && mounted) {
+      final dir = Directory(path);
+      if (await dir.exists()) {
+        // Project root switching is a future enhancement; currently we just
+        // expose the folder via the file picker.
+      }
+    }
+  }
+
+  Widget _buildDesktopStatusStrip() {
+    return Container(
+      height: 22,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: const BoxDecoration(
+        color: VscodeTheme.statusBg,
+        border: Border(top: BorderSide(color: Color(0xFF005A99))),
+      ),
+      child: Row(children: [
+        Icon(
+          PlatformInfo.isLinux
+              ? Icons.laptop
+              : PlatformInfo.isMacOS
+                  ? Icons.laptop_mac
+                  : Icons.computer,
+          color: Colors.white,
+          size: 12,
+        ),
+        const SizedBox(width: 6),
+        const Text('XunCode',
+            style: TextStyle(
+                color: Colors.white,
+                fontSize: 10,
+                fontWeight: FontWeight.w500)),
+        const Spacer(),
+        Text(PlatformInfo.label,
+            style: const TextStyle(color: Colors.white70, fontSize: 10)),
+      ]),
     );
   }
 
@@ -578,12 +743,17 @@ class _EditorScreenState extends State<EditorScreen> {
     final ext = name.split('.').last.toLowerCase();
     const map = {
       'js': 'javascript', 'ts': 'typescript', 'jsx': 'javascript', 'tsx': 'typescript',
-      'py': 'python', 'kt': 'kotlin', 'java': 'java', 'dart': 'dart', 'go': 'go',
-      'rs': 'rust', 'c': 'c', 'cpp': 'cpp', 'h': 'cpp', 'cs': 'csharp',
-      'html': 'html', 'css': 'css', 'scss': 'scss', 'json': 'json',
-      'yaml': 'yaml', 'yml': 'yaml', 'md': 'markdown', 'sh': 'shell',
+      'mjs': 'javascript', 'cjs': 'javascript',
+      'py': 'python', 'kt': 'kotlin', 'kts': 'kotlin',
+      'java': 'java', 'dart': 'dart', 'go': 'go',
+      'rs': 'rust', 'c': 'c', 'cpp': 'cpp', 'h': 'cpp', 'hpp': 'cpp', 'cs': 'csharp',
+      'html': 'html', 'htm': 'html', 'css': 'css', 'scss': 'scss', 'sass': 'sass',
+      'json': 'json', 'yaml': 'yaml', 'yml': 'yaml', 'md': 'markdown', 'sh': 'shell',
+      'bash': 'shell', 'zsh': 'shell', 'fish': 'shell',
       'xml': 'xml', 'php': 'php', 'rb': 'ruby', 'swift': 'swift',
-      'sql': 'sql', 'r': 'r', 'lua': 'lua',
+      'sql': 'sql', 'r': 'r', 'lua': 'lua', 'dockerfile': 'dockerfile',
+      'makefile': 'makefile', 'cmake': 'cmake', 'ini': 'ini', 'toml': 'toml',
+      'vue': 'vue', 'svelte': 'svelte',
     };
     return map[ext] ?? 'plaintext';
   }

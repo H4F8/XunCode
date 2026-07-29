@@ -14,8 +14,8 @@ class AboutScreen extends StatelessWidget {
     _LinkRef(
       icon: Icons.code,
       label: 'GitHub',
-      handle: '@Hinderchik',
-      url: 'https://github.com/Hinderchik',
+      handle: '@H4F8',
+      url: 'https://github.com/H4F8',
     ),
     _LinkRef(
       icon: Icons.developer_mode,
@@ -82,9 +82,10 @@ class AboutScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
             child: Text(
-              'Proprietary licence (NOT open source). Forks, modification and '
-              'redistribution are prohibited. See LICENSE in the repository '
-              'root for the full terms. © 2026 XunKal1 (Hinderchik).',
+              'Licensed under the Apache License, Version 2.0. You may use, '
+              'modify, and distribute this software under the terms of the '
+              'Apache-2.0 license. See LICENSE in the repository root for the '
+              'full text. © 2026 XunKal1 (H4F8).',
               style: const TextStyle(color: VscodeTheme.fgMuted, fontSize: 12),
             ),
           ),

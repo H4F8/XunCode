@@ -123,4 +123,8 @@ class EditorBridge {
       source: 'window.editor && window.editor.trigger("plugin", ${jsonEncode(command)}, null)',
     );
   }
+
+  void dispose() {
+    // Контроллер WebView освобождается внешне (EditorScreen.dispose).
+  }
 }

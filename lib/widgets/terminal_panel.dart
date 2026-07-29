@@ -578,8 +578,8 @@ class _TerminalViewState extends State<_TerminalView> {
       final code = last & 0x1F;
       widget.tab.session.write(String.fromCharCode(code));
       widget.tab.input.clear();
+      setState(() => _ctrlMod = false);
     }
-    setState(() => _ctrlMod = false);
   }
 }
 

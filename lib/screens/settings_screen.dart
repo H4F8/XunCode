@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -7,6 +9,7 @@ import '../models/settings_model.dart';
 import '../services/file_service.dart';
 import '../services/github_oauth_service.dart';
 import '../services/language_service.dart';
+import '../services/platform_info.dart';
 import '../services/plugin_runtime.dart';
 import '../services/plugin_service.dart';
 import '../services/terminal_service.dart';
@@ -51,9 +54,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _grantStorage() async {
+    if (!PlatformInfo.needsStoragePermission) {
+      // На desktop открываем папку в файловом менеджере ОС.
+      await _openSharedFolder();
+      return;
+    }
     await FileService.requestAllFilesAccess();
     // Re-check after a short delay so the UI updates when the user returns.
     Future.delayed(const Duration(seconds: 1), _loadStorage);
+  }
+
+  Future<void> _openSharedFolder() async {
+    final path = FileService.sharedRoot;
+    final uri = Uri.parse('file://$path');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else if (PlatformInfo.fileManagerCommand(path) != null) {
+      await Process.run(PlatformInfo.fileManagerCommand(path)!, [path],
+          runInShell: false);
+    }
   }
 
   Future<void> _loadGithub() async {
@@ -283,7 +302,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               }
             },
           ),
-          _link(context, 'GitHub: @Hinderchik', 'https://github.com/Hinderchik'),
+          _link(context, 'GitHub: @H4F8', 'https://github.com/H4F8'),
           _link(context, 'Dev channel: t.me/XunKal1Dev', 'https://t.me/XunKal1Dev'),
           _link(context, 'Community: t.me/GodPassTGK', 'https://t.me/GodPassTGK'),
           ListTile(

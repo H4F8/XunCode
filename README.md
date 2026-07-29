@@ -1,106 +1,130 @@
-# XunCode for Android
+# XunCode
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Build APK](https://img.shields.io/badge/Build%20APK-passing-brightgreen)](https://github.com/H4F8/XunCode/actions/workflows/build.yml)
+[![Build APK](https://github.com/H4F8/XunCode/actions/workflows/build.yml/badge.svg)](https://github.com/H4F8/XunCode/actions/workflows/build.yml)
 
-> **Open-source code editor for Android.** Free to use, modify, and contribute. Licensed under [Apache-2.0](LICENSE).
+> **Open-source code editor for Android and Linux.** Built with Flutter and the Monaco Editor engine. Free to use, modify, and contribute. Licensed under [Apache-2.0](LICENSE).
 
----
+## Overview
 
-## Русский
+XunCode is a native, cross-platform code editor that brings a desktop-like editing experience to mobile devices and Linux desktops. It combines the Monaco Editor (the same engine powering Visual Studio Code) with a plugin ecosystem, an embedded terminal, and deep customization options.
 
-**XunCode — мощный редактор кода для Android.** Нативное Flutter-приложение с движком Monaco Editor, GitHub-плагинами, плагин-маркетплейсом, поддержкой Tor через Orbot и встроенным proot-терминалом с Alpine Linux.
+## Real feature set
 
-### Возможности
-- Monaco Editor — тот же движок, что в VS Code, подсветка для 25+ языков.
-- IntelliSense по всему проекту, переход к определению, переименование.
-- **Мультиязычность:** Русский / English «из коробки», любой `.txt` в `Shared/XunCode/Languages/` добавляет новый язык интерфейса.
-- **Установка языков программирования:** Python, Node.js, Go, Rust, Ruby, Lua, PHP, Java + любые свои сборки по URL.
-- Плагин-система: GitHub-репо с `plugin.json` + `main.js`, песочница на InAppWebView.
-- Маркетплейс плагинов (Vercel-бэкенд) с рейтингами и отзывами.
-- Терминал proot + Alpine, fallback на `/system/bin/sh`.
-- Прокси: HTTP/HTTPS, SOCKS5, Tor через Orbot.
-- Запуск кода: Python, JS/Node, PHP, HTML/CSS preview, Java, C/C++.
+### Editor
+- **Monaco Editor** — syntax highlighting, bracket matching, auto-indentation, and minimap for 25+ languages including JavaScript, TypeScript, Python, Dart, Go, Rust, C/C++, Java, Kotlin, PHP, Ruby, Lua, HTML, CSS, SCSS, JSON, YAML, Markdown, Shell, SQL, Swift, and XML.
+- **Settings** — configurable font size, font family, tab size, word wrap, auto-save, and completion behavior.
+- **File tabs** — open multiple files, switch between them, and track unsaved changes.
+- **Project sidebar** — browse the projects directory, open files, and navigate the workspace.
+- **Command palette** — trigger plugin commands from a searchable list.
+- **Status bar** — cursor line/column, active language, and quick Tor toggle.
 
-### Требования
-Android 10+ (API 29). Работа на Android 13+ стабилизирована через `libaxs.so` (обход noexec/W^X).
+### Terminal
+- **proot + Alpine Linux** — a full user-space Linux environment (no root required).
+- **AXS (Acode eXecution Server)** — bypasses Android 13+ `noexec`/`W^X` restrictions using `memfd_create`.
+- **Fallback shell** — if Alpine is not installed or unsupported, the app falls back to `/system/bin/sh` on Android.
+- **Multiple tabs** — open several terminal sessions at once.
+- **On-screen keys** — quick-access row for Ctrl, Esc, Tab, arrow keys, and common symbols.
 
-### Установка
-- **APK:** [GitHub Releases](https://github.com/H4F8/XunCode/releases) или [артефакты CI](https://github.com/H4F8/XunCode/actions).
+### Plugins
+- **GitHub-based plugins** — install any public repository that contains `plugin.json` + `main.js`.
+- **Sandboxed execution** — plugins run inside an isolated `HeadlessInAppWebView` with a permission model.
+- **Plugin API** — JavaScript API covering editor access, file system, HTTP requests, terminal/process execution, settings, storage, workspace search, and UI prompts.
+- **Marketplace** — browse, install, and review plugins (backend can be self-hosted or deployed on Vercel).
+- **Runtime management** — activate, deactivate, reload, and uninstall plugins without restarting the app.
 
-### Сборка из исходников
+### Customization and runtimes
+- **UI language packs** — Russian and English are bundled; additional languages can be added by placing `.txt` files in `Shared/XunCode/Languages/`.
+- **Language / runtime installer** — download and install development runtimes such as Python, Node.js, Go, Rust, Ruby, Lua, PHP, Java, or any custom URL.
+- **Theme** — VS Code Dark+-inspired color theme with a consistent visual style across the app.
+
+### Networking
+- **Proxy support** — HTTP/HTTPS and SOCKS5 proxy configuration.
+- **Tor via Orbot** — start/stop Orbot directly from the status bar.
+
+### Platforms
+- **Android** — primary target. Minimum SDK 26, recommended Android 10+ (API 29+). Android 13+ support is stabilized through `libaxs.so` and `libproot.so` placed in `jniLibs`.
+- **Linux** — desktop build is supported via Flutter's Linux target. The terminal uses the native system shell instead of proot, and the plugin sandbox works out of the box.
+
+## Requirements
+
+| Platform | Minimum version |
+|----------|-----------------|
+| Android  | API 26 (Android 8.0) |
+| Linux    | 64-bit GTK-based desktop |
+| Flutter  | 3.24.5 or newer |
+| Dart     | 3.3.0 or newer |
+
+## Install
+
+### Android
+Download the latest APK from [GitHub Releases](https://github.com/H4F8/XunCode/releases) or grab a CI artifact from the [Actions tab](https://github.com/H4F8/XunCode/actions).
+
+### Linux
+Releases are published as AppImage, `.deb`, `.rpm`, and portable tar archives on the [releases page](https://github.com/H4F8/XunCode/releases).
+
+## Build from source
+
 ```sh
 git clone https://github.com/H4F8/XunCode.git
 cd XunCode
+
+# Bundle Monaco Editor assets
 npm install && npm run build:monaco
+
+# Fetch Flutter dependencies
 flutter pub get
+
+# Generate launcher icons
 flutter pub run flutter_launcher_icons
+
+# Android debug APK
 flutter build apk --debug
+
+# Linux release
+flutter build linux --release
 ```
 
-### Контрибьюция
-Мы рады PR, issues и идеям! Смотрите [docs/PLUGIN_API_FULL.md](docs/PLUGIN_API_FULL.md) для документации по Plugin API.
-- GitHub: [@H4F8](https://github.com/H4F8)
-- Dev-канал: [t.me/XunKal1Dev](https://t.me/XunKal1Dev)
-- Сообщество: [t.me/GodPassTGK](https://t.me/GodPassTGK)
+For the release Android APK you will need a signing keystore. Set the following repository secrets for CI signing:
+- `KEYSTORE_PASSWORD`
+- `KEY_ALIAS`
+- `KEY_PASSWORD`
 
-### Благодарности / Acknowledgments
-- **Acode Foundation** — за подход к обходу noexec на Android 13+ и готовые бинарники proot.
-  Репозиторий: [https://github.com/Acode-Foundation/Acode](https://github.com/Acode-Foundation/Acode)
-- **bajrangCoder** за **acodex_server (AXS)** — решение проблемы выполнения кода на Android 13+ через memfd_create.
-  Репозиторий: [https://github.com/bajrangCoder/acodex_server](https://github.com/bajrangCoder/acodex_server)
+## Project layout
 
-### Используемые компоненты / Components
-- **PRoot** — пользовательский chroot без root: [https://github.com/proot-me/proot](https://github.com/proot-me/proot)
-- **Alpine Linux** — лёгкий Linux для терминала: [https://alpinelinux.org](https://alpinelinux.org)
-- **AXS (Acode eXecution Server)** — обход noexec через memfd_create: [https://github.com/bajrangCoder/acodex_server](https://github.com/bajrangCoder/acodex_server)
-
----
-
-## English
-
-**XunCode is an open-source code editor for Android.** A native Flutter app with the Monaco Editor engine, GitHub-based plugins, a plugin marketplace, Tor support via Orbot, and an embedded proot terminal running Alpine Linux.
-
-### Features
-- Monaco Editor — same engine as VS Code, syntax highlighting for 25+ languages.
-- Project-wide IntelliSense, go-to-definition, rename.
-- **Multi-language UI:** Russian / English out of the box; drop any `.txt` into `Shared/XunCode/Languages/` to add another language.
-- **Install runtimes:** Python, Node.js, Go, Rust, Ruby, Lua, PHP, Java, plus any custom build by URL.
-- Plugin system — GitHub repos with `plugin.json` + `main.js`, sandboxed WebView.
-- Plugin marketplace (Vercel backend) with ratings and reviews.
-- proot + Alpine terminal, falls back to `/system/bin/sh`.
-- Proxy: HTTP/HTTPS, SOCKS5, Tor via Orbot.
-- Run code: Python, JS/Node, PHP, HTML/CSS preview, Java, C/C++.
-
-### Requirements
-Android 10+ (API 29). Stabilized on Android 13+ via `libaxs.so` (noexec/W^X bypass).
-
-### Install
-- **APK:** [GitHub Releases](https://github.com/H4F8/XunCode/releases) or [CI artefacts](https://github.com/H4F8/XunCode/actions).
-
-### Build from source
-```sh
-git clone https://github.com/H4F8/XunCode.git
-cd XunCode
-npm install && npm run build:monaco
-flutter pub get
-flutter pub run flutter_launcher_icons
-flutter build apk --debug
+```
+XunCode/
+├── android/            # Android-specific Kotlin code, manifests, and native libs
+├── assets/             # Monaco Editor bundle, languages, plugin examples
+├── docs/               # Plugin API documentation
+├── lib/                # Dart/Flutter source code
+├── market/             # Optional Vercel marketplace backend
+├── scripts/            # Monaco bundling and build helpers
+├── .github/workflows/  # GitHub Actions CI
+├── pubspec.yaml
+└── README.md
 ```
 
-### Contributing
-PRs, issues, and ideas are welcome! See [docs/PLUGIN_API_FULL.md](docs/PLUGIN_API_FULL.md) for the full Plugin API reference.
+## Plugin API
+
+See the full reference in [docs/PLUGIN_API.md](docs/PLUGIN_API.md). Example plugins are located in [example-plugins/](example-plugins/).
+
+## Contributing
+
+Pull requests, bug reports, and feature ideas are welcome.
+
 - GitHub: [@H4F8](https://github.com/H4F8)
 - Dev channel: [t.me/XunKal1Dev](https://t.me/XunKal1Dev)
 - Community: [t.me/GodPassTGK](https://t.me/GodPassTGK)
 
-### Acknowledgments
-- **Acode Foundation** — for the noexec bypass approach on Android 13+ and ready-to-use proot binaries.
-  Repository: [https://github.com/Acode-Foundation/Acode](https://github.com/Acode-Foundation/Acode)
-- **bajrangCoder** for **acodex_server (AXS)** — code execution on Android 13+ via memfd_create.
-  Repository: [https://github.com/bajrangCoder/acodex_server](https://github.com/bajrangCoder/acodex_server)
+## Acknowledgments
 
-### Components
-- **PRoot** — user-space chroot without root: [https://github.com/proot-me/proot](https://github.com/proot-me/proot)
-- **Alpine Linux** — lightweight Linux for the terminal: [https://alpinelinux.org](https://alpinelinux.org)
-- **AXS (Acode eXecution Server)** — noexec bypass via memfd_create: [https://github.com/bajrangCoder/acodex_server](https://github.com/bajrangCoder/acodex_server)
+- **Acode Foundation** — for the noexec bypass approach on Android 13+ and ready-to-use proot binaries. Repository: [Acode-Foundation/Acode](https://github.com/Acode-Foundation/Acode)
+- **bajrangCoder** for **acodex_server (AXS)** — code execution on Android 13+ via `memfd_create`. Repository: [bajrangCoder/acodex_server](https://github.com/bajrangCoder/acodex_server)
+- **PRoot** — user-space chroot without root: [proot-me/proot](https://github.com/proot-me/proot)
+- **Alpine Linux** — lightweight Linux for the terminal: [alpinelinux.org](https://alpinelinux.org)
+- **Monaco Editor** — the code editor engine: [microsoft/monaco-editor](https://github.com/microsoft/monaco-editor)
+
+## License
+
+XunCode is licensed under the [Apache License 2.0](LICENSE).

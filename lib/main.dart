@@ -1,9 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'app/theme.dart';
-import 'models/settings_model.dart';
 import 'models/open_file.dart';
+import 'models/settings_model.dart';
 import 'services/file_service.dart';
 import 'services/language_install_service.dart';
 import 'services/language_service.dart';
@@ -43,7 +45,7 @@ class XunCodeApp extends StatelessWidget {
     return MaterialApp(
       title: 'XunCode',
       debugShowCheckedModeBanner: false,
-      theme: VscodeTheme.dark(),
+      theme: AppTheme.light(),
       darkTheme: VscodeTheme.dark(),
       themeMode: settings.themeMode,
       locale: language.locale,

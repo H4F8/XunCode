@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:archive/archive_io.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
@@ -11,28 +12,37 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'file_service.dart';
 
-/// AXS (Acode eXecution Server) — обходит noexec на Android 13+ через memfd_create.
-/// AXS запускается как отдельный процесс и выполняет команды внутри proot-песочницы.
+/// Платформо-зависимый терминальный мост.
 ///
-/// Бинарник AXS лежит в assets/axs/axs, при первом запуске копируется в filesDir/axs/axs.
-/// proot-библиотеки (libproot.so, libtalloc.so и др.) встроены в APK через jniLibs.
+/// На Android используется AXS (Acode eXecution Server) + proot + Alpine Linux
+/// для обхода noexec/W^X на Android 13+. AXS стартует как отдельный процесс
+/// и принимает WebSocket-подключения, через которые идёт ввод/вывод.
+///
+/// На Linux/macOS/Windows (desktop) AXS не нужен — терминальная сессия
+/// запускается как обычный дочерний процесс через [Process.start], а ввод и
+/// вывод идут напрямую через stdin/stdout. Это упрощает код и избавляет от
+/// необходимости тянуть Alpine rootfs.
 class TerminalBridge {
   static const _method = MethodChannel('com.xunkal1.xuncode/terminal');
   static const _events = EventChannel('com.xunkal1.xuncode/terminal/events');
 
   static int? _axsPort;
   static Process? _axsProcess;
-  static final Map<String, WebSocket> _sockets = {};
+  static final Map<String, _BackendSession> _sockets = {};
   static const _axsTimeout = Duration(seconds: 10);
 
-  // ── AXS binary management ──────────────────────────────────────────
+  static bool get _isDesktop =>
+      !kIsWeb && (Platform.isLinux || Platform.isMacOS || Platform.isWindows);
+
+  // ── AXS binary management (Android only) ───────────────────────────
 
   static Future<File> _axsBinary() async {
-    // Сначала пробуем libaxs.so из nativeLibraryDir (обход noexec/W^X)
+    if (_isDesktop) {
+      throw UnsupportedError('AXS is Android-only');
+    }
     final native = await _axsBinaryFromNativeLib();
     if (native != null) return native;
 
-    // Fallback: копируем из assets
     final dir = await getApplicationSupportDirectory();
     final axsDir = Directory('${dir.path}/axs');
     final axsFile = File('${axsDir.path}/axs');
@@ -46,8 +56,9 @@ class TerminalBridge {
 
   static Future<File?> _axsBinaryFromNativeLib() async {
     try {
-      final nativeDir = await _method.invokeMethod<String>('getNativeLibraryDir') ??
-          '/data/app/com.xunkal1.xuncode/lib/arm64';
+      final nativeDir =
+          await _method.invokeMethod<String>('getNativeLibraryDir') ??
+              '/data/app/com.xunkal1.xuncode/lib/arm64';
       final file = File('$nativeDir/libaxs.so');
       if (await file.exists() && await file.length() > 0) return file;
     } catch (_) {}
@@ -56,10 +67,12 @@ class TerminalBridge {
 
   static Future<void> _ensureAxs() async {
     if (_axsProcess != null) return;
+    if (_isDesktop) return; // no AXS on desktop
     final axs = await _axsBinary();
     final rootfs = await rootfsPath();
-    final nativeDir = await _method.invokeMethod<String>('getNativeLibraryDir') ??
-        '/data/app/com.xunkal1.xuncode/lib/arm64';
+    final nativeDir =
+        await _method.invokeMethod<String>('getNativeLibraryDir') ??
+            '/data/app/com.xunkal1.xuncode/lib/arm64';
     final prootBin = '$nativeDir/libproot.so';
 
     _axsProcess = await Process.start(axs.path, [
@@ -86,26 +99,40 @@ class TerminalBridge {
       return _axsPort;
     });
 
-    await Future.any([
-      portFuture,
-      Future.delayed(_axsTimeout, () => throw TimeoutException('AXS start timeout')),
-    ]);
-  }
-
-  static Future<WebSocket> _connectWs(int port) async {
-    return WebSocket.connect(
-      'ws://127.0.0.1:$port/terminals/new',
-    ).timeout(const Duration(seconds: 5));
+    try {
+      await Future.any([
+        portFuture,
+        Future.delayed(
+            _axsTimeout, () => throw TimeoutException('AXS start timeout')),
+      ]);
+    } catch (_) {
+      _axsProcess?.kill();
+      _axsProcess = null;
+      _axsPort = null;
+      rethrow;
+    }
   }
 
   /// Путь к rootfs Alpine
   static Future<String> rootfsPath() async {
+    if (_isDesktop) {
+      // На desktop мы не используем proot-rootfs, но возвращаем путь к
+      // пользовательской директории для совместимости.
+      final dir = await getApplicationSupportDirectory();
+      final rootfs = Directory('${dir.path}/rootfs');
+      if (!await rootfs.exists()) await rootfs.create(recursive: true);
+      return rootfs.path;
+    }
     return await _method.invokeMethod<String>('rootfsPath') ?? '';
   }
 
-  // ── Alpine rootfs ───────────────────────────────────────────────────
+  // ── Alpine rootfs (Android only — на desktop без proot) ───────────
 
   static Future<bool> isAlpineInstalled() async {
+    if (_isDesktop) {
+      // На desktop всегда «установлено» — используется системный shell.
+      return true;
+    }
     final prefs = await SharedPreferences.getInstance();
     if (prefs.getBool('alpine.installed') == true) {
       try {
@@ -140,6 +167,7 @@ class TerminalBridge {
   static Future<void> clearAlpineCache() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('alpine.installed', false);
+    if (_isDesktop) return;
     try {
       final root = await rootfsPath();
       if (root.isNotEmpty) {
@@ -153,16 +181,22 @@ class TerminalBridge {
   }
 
   static Future<void> markAlpineInstalled() async {
+    if (_isDesktop) return;
     await _method.invokeMethod('markAlpineInstalled');
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('alpine.installed', true);
   }
 
-  /// Скачивает Alpine minirootfs при первом запуске (с прогрессом и cancel)
+  /// Скачивает Alpine minirootfs при первом запуске (Android only).
   static Future<void> installAlpine({
     void Function(double progress, String stage)? onProgress,
     CancelToken? cancelToken,
   }) async {
+    if (_isDesktop) {
+      onProgress?.call(1.0, 'Desktop — uses system shell');
+      await markAlpineInstalled();
+      return;
+    }
     if (await isAlpineInstalled()) return;
 
     final root = await rootfsPath();
@@ -273,65 +307,170 @@ class TerminalBridge {
     }
   }
 
-  // ── Terminal sessions via AXS ──────────────────────────────────────
+  // ── Terminal sessions ──────────────────────────────────────────────
 
   static Future<TerminalSession> create({
     required String id,
     int cols = 80,
     int rows = 24,
   }) async {
-    await _ensureAxs();
     final session = TerminalSession._(id, cols, rows);
-    await session._open();
+    try {
+      if (_isDesktop) {
+        await session._openDesktop();
+      } else {
+        await session._open();
+      }
+    } catch (_) {
+      await session.kill();
+      rethrow;
+    }
     return session;
   }
 
   static Future<TerminalSession> createUnsandboxed({required String id}) async {
     final session = TerminalSession._(id, 80, 24);
-    await session._openUnsandboxed();
+    try {
+      await session._openUnsandboxed();
+    } catch (_) {
+      await session.kill();
+      rethrow;
+    }
     return session;
   }
 
   /// Write data to a terminal session by ID (used by plugins).
   static Future<void> write({required String id, required String data}) async {
-    final ws = _sockets[id];
-    if (ws != null) {
-      ws.add(data);
-    }
+    final s = _sockets[id];
+    if (s == null) return;
+    s.write(data);
   }
 
   /// Kill a terminal session by ID (used by plugins).
   static Future<void> kill({required String id}) async {
-    final ws = _sockets.remove(id);
-    if (ws != null) {
-      await ws.close();
-    }
+    final s = _sockets.remove(id);
+    if (s != null) await s.close();
   }
 
   // ── Helpers ────────────────────────────────────────────────────────
 
   static Future<void> _silent(Future<Object?> Function() block) async {
-    try { await block(); } catch (_) {}
+    try {
+      await block();
+    } catch (_) {}
   }
 
   static String _alpineArch() {
     final abi = _abi();
     switch (abi) {
-      case 'arm64-v8a': return 'aarch64';
-      case 'armeabi-v7a': return 'armv7';
-      case 'x86_64': return 'x86_64';
-      case 'x86': return 'x86';
-      default: return 'aarch64';
+      case 'arm64-v8a':
+        return 'aarch64';
+      case 'armeabi-v7a':
+        return 'armv7';
+      case 'x86_64':
+        return 'x86_64';
+      case 'x86':
+        return 'x86';
+      default:
+        return 'aarch64';
     }
   }
 
   static String _abi() {
+    if (_isDesktop) {
+      // На desktop Alpine не нужен, но функция вызывается только при
+      // установке rootfs — на desktop installAlpine возвращает раньше.
+      return 'x86_64';
+    }
     final v = Platform.operatingSystemVersion.toLowerCase();
     if (v.contains('aarch64') || v.contains('arm64')) return 'arm64-v8a';
     if (v.contains('armv7') || v.contains('armeabi')) return 'armeabi-v7a';
     if (v.contains('x86_64') || v.contains('amd64')) return 'x86_64';
     if (v.contains('i686') || v.contains('x86')) return 'x86';
     return 'arm64-v8a';
+  }
+}
+
+/// Унифицированная обёртка над Android-WebSocket и desktop-процессом.
+abstract class _BackendSession {
+  Stream<String> get output;
+  bool get isOpen;
+  void write(String data);
+  Future<void> close();
+}
+
+class _WebSocketBackend implements _BackendSession {
+  final WebSocket ws;
+  final _ctrl = StreamController<String>.broadcast();
+  _WebSocketBackend(this.ws) {
+    ws.listen(
+      (data) {
+        if (data is String) _ctrl.add(data);
+      },
+      onError: (e) => _ctrl.add('\n[stream error] $e\n'),
+      onDone: () {
+        if (!_ctrl.isClosed) _ctrl.add('\n[session ended]\n');
+      },
+    );
+  }
+
+  @override
+  Stream<String> get output => _ctrl.stream;
+
+  @override
+  bool get isOpen => ws.readyState == WebSocket.open;
+
+  @override
+  void write(String data) {
+    if (isOpen) ws.add(data);
+  }
+
+  @override
+  Future<void> close() async {
+    await ws.close();
+    if (!_ctrl.isClosed) await _ctrl.close();
+  }
+}
+
+class _DesktopBackend implements _BackendSession {
+  final Process process;
+  final _ctrl = StreamController<String>.broadcast();
+  _DesktopBackend(this.process) {
+    process.stdout
+        .transform(utf8.decoder)
+        .listen((chunk) => _ctrl.add(chunk), onError: (e) {});
+    process.stderr
+        .transform(utf8.decoder)
+        .listen((chunk) => _ctrl.add(chunk), onError: (e) {});
+    process.exitCode.then((code) {
+      if (!_ctrl.isClosed) {
+        _ctrl.add('\n[process exited with code $code]\n');
+      }
+    });
+  }
+
+  @override
+  Stream<String> get output => _ctrl.stream;
+
+  @override
+  bool get isOpen => true;
+
+  @override
+  void write(String data) {
+    try {
+      process.stdin.add(utf8.encode(data));
+    } catch (_) {}
+  }
+
+  @override
+  Future<void> close() async {
+    try {
+      process.stdin.close();
+    } catch (_) {}
+    try {
+      process.kill();
+    } catch (_) {}
+    if (!_ctrl.isClosed) await _ctrl.close();
   }
 }
 
@@ -349,21 +488,43 @@ class TerminalSession {
   Future<void> _open() async {
     await TerminalBridge._ensureAxs();
     final port = TerminalBridge._axsPort ?? 8767;
-    final ws = await TerminalBridge._connectWs(port);
-    TerminalBridge._sockets[id] = ws;
+    final ws = await _connectWs(port);
+    final backend = _WebSocketBackend(ws);
+    TerminalBridge._sockets[id] = backend;
+    _sub = backend.output.listen((chunk) => _output.add(chunk));
+  }
 
-    ws.listen(
-      (data) {
-        if (data is String) _output.add(data);
-      },
-      onError: (e) => _output.add('\n[stream error] $e\n'),
-      onDone: () {
-        if (!_output.isClosed) _output.add('\n[session ended]\n');
+  /// Запуск нативного системного shell как дочернего процесса.
+  /// Используется на desktop-платформах (Linux/macOS/Windows) — никакого
+  /// AXS и proot не нужно, всё работает нативно.
+  Future<void> _openDesktop() async {
+    final shell = _detectShell();
+    final home = _homeDir();
+    final process = await Process.start(
+      shell.executable,
+      shell.args,
+      workingDirectory: home,
+      environment: {
+        'HOME': home,
+        'TERM': 'xterm-256color',
+        'PS1': r'\u@\h:\w\$ ',
+        'PATH': Platform.environment['PATH'] ?? '/usr/local/bin:/usr/bin:/bin',
+        'COLORTERM': 'truecolor',
       },
     );
+    final backend = _DesktopBackend(process);
+    TerminalBridge._sockets[id] = backend;
+    _sub = backend.output.listen((chunk) => _output.add(chunk));
+
+    _output.add(
+        '[terminal] ${shell.label} launched (pid=${process.pid})\n');
   }
 
   Future<void> _openUnsandboxed() async {
+    if (!kIsWeb && (Platform.isLinux || Platform.isMacOS || Platform.isWindows)) {
+      await _openDesktop();
+      return;
+    }
     _sub = TerminalBridge._events
         .receiveBroadcastStream({'id': id})
         .listen(
@@ -376,12 +537,29 @@ class TerminalSession {
           },
         );
 
-    final result = await TerminalBridge._method.invokeMethod<String>('createUnsandboxed', {
-      'id': id,
-    });
+    final result = await TerminalBridge._method
+        .invokeMethod<String>('createUnsandboxed', {'id': id});
     if (result != null && result != 'ok' && !result.startsWith('[terminal]')) {
       _output.add(result);
     }
+  }
+
+  Future<WebSocket> _connectWs(int port) async {
+    const maxAttempts = 3;
+    WebSocketException? lastError;
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await WebSocket.connect(
+          'ws://127.0.0.1:$port/terminals/new',
+        ).timeout(const Duration(seconds: 5));
+      } on WebSocketException catch (e) {
+        lastError = e;
+        if (attempt < maxAttempts) {
+          await Future.delayed(Duration(milliseconds: 200 * attempt));
+        }
+      }
+    }
+    throw lastError ?? Exception('WebSocket connection failed');
   }
 
   Future<void> write(String data) async {
@@ -393,6 +571,12 @@ class TerminalSession {
   Future<void> resize(int c, int r) async {
     cols = c;
     rows = r;
+    if (kIsWeb) return;
+    if (Platform.isLinux || Platform.isMacOS || Platform.isWindows) {
+      // ANSI resize не реализован в обёртке — обновляем только поля.
+      return;
+    }
+    await TerminalBridge._ensureAxs();
     final port = TerminalBridge._axsPort ?? 8767;
     await http.post(
       Uri.parse('http://127.0.0.1:$port/terminals/$id/resize'),
@@ -403,9 +587,43 @@ class TerminalSession {
 
   Future<void> kill() async {
     runCatching(() => _sub?.cancel());
+    _sub = null;
     await TerminalBridge.kill(id: id);
     if (!_output.isClosed) await _output.close();
   }
+
+  static _ShellSpec _detectShell() {
+    final env = Platform.environment;
+    final shellPath = env['SHELL'];
+    if (shellPath != null && shellPath.isNotEmpty) {
+      return _ShellSpec(shellPath, const [], _labelFromPath(shellPath));
+    }
+    if (Platform.isWindows) {
+      // PowerShell или cmd.
+      return _ShellSpec('cmd.exe', const ['/Q', '/K'], 'cmd.exe');
+    }
+    return _ShellSpec('/bin/sh', const ['-i'], '/bin/sh');
+  }
+
+  static String _labelFromPath(String p) {
+    final base = p.split('/').last;
+    return base.isEmpty ? p : base;
+  }
+
+  static String _homeDir() {
+    try {
+      final h = Platform.environment['HOME'];
+      if (h != null && h.isNotEmpty) return h;
+    } catch (_) {}
+    return Directory.current.path;
+  }
+}
+
+class _ShellSpec {
+  final String executable;
+  final List<String> args;
+  final String label;
+  const _ShellSpec(this.executable, this.args, this.label);
 }
 
 T? runCatching<T>(T Function() block) {
