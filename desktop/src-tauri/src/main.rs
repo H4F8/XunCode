@@ -29,7 +29,7 @@ async fn pty_create(
     let cmd = CommandBuilder::new("/bin/sh");
     pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
 
-    let lock = state.pty.lock().map_err(|e| e.to_string())?;
+    let mut lock = state.pty.lock().map_err(|e| e.to_string())?;
     *lock = Some(pair);
     Ok(())
 }
