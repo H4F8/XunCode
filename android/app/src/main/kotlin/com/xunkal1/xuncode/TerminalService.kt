@@ -22,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap
 class TerminalService(private val appContext: Context) {
 
     private val sessions = ConcurrentHashMap<String, TerminalSession>()
-    private val outputHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    val outputHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     fun appDataDir(): File {
         val ext = appContext.getExternalFilesDir(null) ?: appContext.filesDir

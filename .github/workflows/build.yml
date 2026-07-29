@@ -144,6 +144,9 @@ jobs:
       - name: Install npm deps and bundle Monaco Editor
         run: npm install && npm run build:monaco
 
+      - name: Generate Flutter managed files for Linux
+        run: flutter create --platforms=linux . --project-name=xuncode
+
       - name: Install Flutter dependencies
         run: flutter pub get
 
