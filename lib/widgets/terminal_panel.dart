@@ -582,14 +582,3 @@ class _TerminalViewState extends State<_TerminalView> {
     }
   }
 }
-
-/// Strip basic ANSI escape sequences. We render plain text for now ÄËĂÂĂÂ a future
-/// pass can wire xterm.js in a WebView for full color support.
-String _stripAnsi(String s) {
-  return s
-      .replaceAll(RegExp(r'\x1B\[[0-9;?]*[ -/]*[@-~]'), '')
-      .replaceAll(RegExp(r'\x1B\][^\x07]*\x07'), '')
-      .replaceAll(RegExp(r'\x1B[()][AB012]'), '')
-      .replaceAll('\r\n', '\n')
-      .replaceAll('\r', '\n');
-}

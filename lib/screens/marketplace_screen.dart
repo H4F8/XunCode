@@ -117,8 +117,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
     ).then((_) => _load());
   }
 
-  List<Plugin> get _allTags => _plugins;
-
   List<String> get _availableTags {
     final set = <String>{};
     for (final p in _plugins) {

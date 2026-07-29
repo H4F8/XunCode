@@ -40,7 +40,8 @@ class DesktopMenuBar extends StatelessWidget {
     required this.onReloadPlugins,
   });
 
-  static const _shortcutMeta = PlatformInfo.isMacOS ? 'Cmd' : 'Ctrl';
+  final bool _isMacOS = PlatformInfo.isMacOS;
+  String get _shortcutMeta => _isMacOS ? 'Cmd' : 'Ctrl';
 
   @override
   Widget build(BuildContext context) {
@@ -81,15 +82,15 @@ class DesktopMenuBar extends StatelessWidget {
                 '$_shortcutMeta+Shift+`'),
           ]),
           _menuButton(context, 'Plugins', [
-            _mi('Marketplace', Icons.storefront_outlined, onMarketplace),
-            _mi('Reload Plugins', Icons.refresh, onReloadPlugins),
+            _mi('Marketplace', Icons.storefront_outlined, onMarketplace, null),
+            _mi('Reload Plugins', Icons.refresh, onReloadPlugins, null),
           ]),
           _menuButton(context, 'Tools', [
             _mi('Settings', Icons.settings_outlined, onSettings,
                 '$_shortcutMeta+,'),
           ]),
           _menuButton(context, 'Help', [
-            _mi('About', Icons.info_outline, onAbout),
+            _mi('About', Icons.info_outline, onAbout, null),
           ]),
           const Spacer(),
           if (PlatformInfo.isDesktop) _themeToggle(context),
