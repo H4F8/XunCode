@@ -159,13 +159,11 @@ jobs:
       - name: Install npm deps and bundle Monaco Editor
         run: npm install && npm run build:monaco
 
-      - name: Bundle Alpine rootfs into assets
+      - name: Create rootfs stubs (Linux uses the system shell, not Alpine)
         run: |
-          if [ ! -f "assets/rootfs/rootfs.tar.gz" ]; then
-            echo "Rootfs not embedded; downloading for x86_64..."
-            ./scripts/bundle-rootfs.sh x86_64
-          fi
-          ls -lh assets/rootfs/rootfs.tar.gz
+          mkdir -p assets/rootfs
+          echo '{"arch":"x86_64","source":"system-shell","stub":true}' > assets/rootfs/manifest.json
+          touch assets/rootfs/rootfs.tar.gz
 
       - name: Install Flutter dependencies
         run: flutter pub get
