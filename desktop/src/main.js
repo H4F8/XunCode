@@ -3,6 +3,7 @@ import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import { WebLinksAddon } from 'xterm-addon-web-links';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 
 const i18n = {
   ru: {
@@ -141,25 +142,19 @@ function initTerminal() {
       const { cols, rows } = fitAddon.proposeDimensions();
       await invoke('pty_create', { cols, rows });
       term.writeln('\x1b[1;32mXunCode Terminal\x1b[0m');
-      readLoop(term);
+      listen('pty:data', (event) => {
+        term.write(event.payload);
+      });
     } catch (e) {
       term.writeln(`\r\n[pty error] ${e}`);
     }
   })();
 
-  window.addEventListener('resize', () => fitAddon.fit());
-}
-
-async function readLoop(term) {
-  while (true) {
-    try {
-      const data = await invoke('pty_read');
-      if (data) term.write(data);
-    } catch (e) {
-      term.writeln(`\r\n[read error] ${e}`);
-      break;
-    }
-  }
+  window.addEventListener('resize', () => {
+    fitAddon.fit();
+    const { cols, rows } = fitAddon.proposeDimensions();
+    invoke('pty_resize', { cols, rows }).catch(() => {});
+  });
 }
 
 function initTabs() {
