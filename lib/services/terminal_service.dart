@@ -117,15 +117,14 @@ class TerminalBridge {
         Future.delayed(
             _axsTimeout, () => throw TimeoutException('AXS start timeout')),
       ]);
-      if (result is List) {
-        final port = result[0] as int?;
-        final err = result[1] as String?;
-        if (port == null || port <= 0) {
-          _axsProcess?.kill();
-          _axsProcess = null;
-          _axsPort = null;
-          throw Exception('AXS did not report a port${err?.isNotEmpty == true ? ": $err" : ""}');
-        }
+      final resultList = result as List<dynamic>;
+      final port = resultList[0] as int?;
+      final err = resultList[1] as String?;
+      if (port == null || port <= 0) {
+        _axsProcess?.kill();
+        _axsProcess = null;
+        _axsPort = null;
+        throw Exception('AXS did not report a port${err?.isNotEmpty == true ? ": $err" : ""}');
       }
     } catch (_) {
       _axsProcess?.kill();
