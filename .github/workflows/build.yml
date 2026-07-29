@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
 
 env:
-  FLUTTER_VERSION: '3.24.5'
+  FLUTTER_VERSION: '3.44.8'
 
 jobs:
   # ── Android build ─────────────────────────────────────────────────────────
