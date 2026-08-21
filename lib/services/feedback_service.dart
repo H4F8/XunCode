@@ -23,6 +23,9 @@ class FeedbackService {
   /// Каталог приложений разработчика (самохостинг).
   static const marketUrl = 'https://vscodemobile-market.vercel.app/';
 
+  /// Вкладка «Идеи» каталога — туда ведёт кнопка в форме обратной связи.
+  static const ideasUrl = '$marketUrl#ideas';
+
   static bool get configured =>
       !_botToken.startsWith('PUT_') && !_chatId.startsWith('PUT_');
 

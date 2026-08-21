@@ -167,7 +167,7 @@ class UpdateService {
 
   /// Версия по умолчанию для desktop-сборок; на Android берётся из
   /// PackageManager, поэтому здесь она только запасная.
-  static const _fallbackVersion = '1.2.2';
+  static const _fallbackVersion = '1.2.3';
 
   /// Определить источник установки (Шаг 3.1 ТЗ).
   static Future<InstallPlatform> detectPlatform() async {

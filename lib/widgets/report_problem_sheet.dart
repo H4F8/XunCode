@@ -59,7 +59,7 @@ class _ReportSheetState extends State<_ReportSheet>
 
   Future<void> _openMarket() async {
     // Каталог разработчика (самохостинг) — открываем во внешнем браузере.
-    final uri = Uri.parse(FeedbackService.marketUrl);
+    final uri = Uri.parse(FeedbackService.ideasUrl);
     bool opened = false;
     try {
       if (await canLaunchUrl(uri)) {
@@ -68,7 +68,7 @@ class _ReportSheetState extends State<_ReportSheet>
     } catch (_) {}
     if (opened || !mounted) return;
     if (!mounted) return;
-    await Clipboard.setData(ClipboardData(text: FeedbackService.marketUrl));
+    await Clipboard.setData(ClipboardData(text: FeedbackService.ideasUrl));
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(LanguageService.of(context).tr('feedback.link_copied')),
       backgroundColor: VscodeTheme.accent,
