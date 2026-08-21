@@ -18,6 +18,27 @@ if (flutterVersionCode == null) flutterVersionCode = '1'
 def flutterVersionName = localProperties.getProperty('flutter.versionName')
 if (flutterVersionName == null) flutterVersionName = '1.0'
 
+// Подпись релиза: сначала переменные окружения (CI), затем key.properties
+// (локальная сборка). Если ключа нет — фолбэк на debug, чтобы сборка не падала.
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('key.properties')
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withReader('UTF-8') { reader ->
+        keystoreProperties.load(reader)
+    }
+}
+
+def ksStorePath = System.getenv('KEYSTORE_PATH') ?: keystoreProperties.getProperty('storeFile')
+def ksStorePassword = System.getenv('KEYSTORE_PASSWORD') ?: keystoreProperties.getProperty('storePassword')
+def ksKeyAlias = System.getenv('KEY_ALIAS') ?: keystoreProperties.getProperty('keyAlias')
+def ksKeyPassword = System.getenv('KEY_PASSWORD') ?: keystoreProperties.getProperty('keyPassword')
+def ksStoreFile = (ksStorePath != null) ? file(ksStorePath) : null
+def hasReleaseKey = ksStoreFile != null &&
+        ksStoreFile.exists() &&
+        ksStorePassword != null &&
+        ksKeyAlias != null &&
+        ksKeyPassword != null
+
 android {
     buildFeatures {
         buildConfig true
@@ -48,9 +69,20 @@ android {
         resValue "string", "app_name", "XunCode"
     }
 
+    signingConfigs {
+        if (hasReleaseKey) {
+            release {
+                storeFile ksStoreFile
+                storePassword ksStorePassword
+                keyAlias ksKeyAlias
+                keyPassword ksKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig signingConfigs.debug
+            signingConfig hasReleaseKey ? signingConfigs.release : signingConfigs.debug
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'

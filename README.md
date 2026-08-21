@@ -111,10 +111,35 @@ flutter build apk --debug --flavor root
 flutter build linux --release
 ```
 
-For the release Android APK you will need a signing keystore. Set the following repository secrets for CI signing:
-- `KEYSTORE_PASSWORD`
-- `KEY_ALIAS`
-- `KEY_PASSWORD`
+For the release Android APK you will need a signing keystore. The CI signs release APKs automatically from repository secrets:
+
+| Secret | Meaning |
+|--------|---------|
+| `KEYSTORE_BASE64` | your keystore file, base64-encoded |
+| `KEYSTORE_PASSWORD` | keystore password |
+| `KEY_ALIAS` | key alias inside the keystore |
+| `KEY_PASSWORD` | key password |
+
+Generate a keystore once and put it into secrets:
+
+```sh
+keytool -genkey -v -keystore upload-keystore.jks \
+  -keyalg RSA -keysize 2048 -validity 10000 -alias xuncode
+base64 -w0 upload-keystore.jks   # Linux; macOS: base64 -i upload-keystore.jks
+```
+
+Then add the four secrets in *Settings → Secrets and variables → Actions*. If `KEYSTORE_BASE64` is missing, CI falls back to debug signing with a warning — never publish such an APK.
+
+For local release builds you can instead create `android/key.properties`:
+
+```properties
+storeFile=/absolute/path/upload-keystore.jks
+storePassword=***
+keyAlias=xuncode
+keyPassword=***
+```
+
+`key.properties` and any `*.jks` must never be committed (already gitignored).
 
 ## Project layout
 

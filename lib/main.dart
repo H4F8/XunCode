@@ -11,6 +11,7 @@ import 'services/language_install_service.dart';
 import 'services/language_service.dart';
 import 'services/settings_service.dart';
 import 'screens/editor_screen.dart';
+import 'screens/user_agreement_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -61,9 +62,9 @@ class XunCodeApp extends StatelessWidget {
   }
 }
 
-/// Запускает фоновую проверку обновлений после первого кадра и, если
-/// найден критический релиз для платформы пользователя, перекрывает IDE
-/// экраном тотальной блокировки. Мягкое обновление просто зажигает огонёк.
+/// Входная точка UI: сначала пользовательское соглашение (один раз),
+/// затем фоновая проверка обновлений и, при критическом релизе для
+/// платформы пользователя, экран тотальной блокировки поверх IDE.
 class _UpdateGate extends StatefulWidget {
   final Widget child;
 
@@ -80,9 +81,27 @@ class _UpdateGateState extends State<_UpdateGate> {
     // Даём IDE открыться мгновенно; проверка идёт в фоне.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      final model = context.read<UpdateModel>();
-      await model.check();
-      _maybeShowHardBlock(model);
+      if (!_accepted) return; // проверка запустится после принятия
+      await _runUpdateCheck();
+    });
+  }
+
+  bool get _accepted => SettingsService.instance.agreementAccepted;
+
+  Future<void> _runUpdateCheck() async {
+    final model = context.read<UpdateModel>();
+    await model.check();
+    _maybeShowHardBlock(model);
+  }
+
+  void _onAgreementAccepted() {
+    SettingsService.instance.setAgreementAccepted(true).then((_) {
+      if (!mounted) return;
+      setState(() {});
+      // Пользователь внутри IDE — теперь можно проверить обновления.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _runUpdateCheck();
+      });
     });
   }
 
@@ -104,6 +123,12 @@ class _UpdateGateState extends State<_UpdateGate> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_accepted) {
+      return UserAgreementScreen(
+        firstLaunch: true,
+        onAccepted: _onAgreementAccepted,
+      );
+    }
     return widget.child;
   }
 }

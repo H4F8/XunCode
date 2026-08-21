@@ -113,6 +113,12 @@ update.error_launch=Could not open the update link
 settings.updates=Software Update
 settings.updates_subtitle=Check for a new version of XunCode
 
+# User agreement
+legal.title=User Agreement
+legal.accept_btn=Accept and continue
+legal.decline_btn=Decline
+legal.decline_hint=The app cannot be used without accepting the terms — it will close.
+
 # Settings entries
 settings.theme=Theme
 settings.font_size=Font Size

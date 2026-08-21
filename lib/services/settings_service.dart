@@ -44,6 +44,12 @@ class SettingsService {
   bool get hasUpdate => _prefs.getBool('update.has_update') ?? false;
   Future<void> setHasUpdate(bool v) => _prefs.setBool('update.has_update', v);
 
+  /// Принято ли пользовательское соглашение (показывается до входа в IDE).
+  bool get agreementAccepted =>
+      _prefs.getBool('legal.agreement_accepted') ?? false;
+  Future<void> setAgreementAccepted(bool v) =>
+      _prefs.setBool('legal.agreement_accepted', v);
+
   Future<void> set<T>(String key, T value) async {
     if (value is String) await _prefs.setString(key, value);
     else if (value is bool) await _prefs.setBool(key, value);

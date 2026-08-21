@@ -9,9 +9,11 @@ build/
 # Android
 android/.gradle/
 android/local.properties
+android/key.properties
 android/app/debug.keystore
 *.apk
 *.aab
+*.jks
 keystore.jks
 
 # Node

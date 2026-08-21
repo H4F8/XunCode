@@ -21,6 +21,7 @@ import 'github_signin_screen.dart';
 import 'installed_plugins_screen.dart';
 import 'languages_screen.dart';
 import 'plugin_docs_screen.dart';
+import 'user_agreement_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -298,6 +299,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildUpdateTile(context, lang),
 
           _section(lang.tr('settings.section.about')),
+          ListTile(
+            tileColor: VscodeTheme.bgSidebar,
+            dense: true,
+            leading: const Icon(Icons.gavel_outlined,
+                size: 18, color: VscodeTheme.accent),
+            title: Text(lang.tr('legal.title'),
+                style: const TextStyle(color: VscodeTheme.fg, fontSize: 13)),
+            trailing: const Icon(Icons.chevron_right,
+                size: 16, color: VscodeTheme.fgMuted),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const UserAgreementScreen()),
+            ),
+          ),
           _info(lang.tr('settings.about.version'),
               _appVersion.isEmpty ? '…' : _appVersion),
           _info(lang.tr('settings.about.platform'), lang.tr('settings.about.platform_value')),

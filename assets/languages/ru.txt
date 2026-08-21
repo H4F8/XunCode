@@ -113,6 +113,12 @@ update.error_launch=Не удалось открыть ссылку обновл
 settings.updates=Обновление программы
 settings.updates_subtitle=Проверить наличие новой версии XunCode
 
+# Пользовательское соглашение
+legal.title=Пользовательское соглашение
+legal.accept_btn=Принять и продолжить
+legal.decline_btn=Не принимать
+legal.decline_hint=Без принятия условий использование приложения невозможно — оно закроется.
+
 # Пункты настроек
 settings.theme=Тема
 settings.font_size=Размер шрифта
