@@ -19,6 +19,7 @@ module.exports = async (req, res) => {
   const rel = 'ideas.json';
 
   if (req.method === 'GET') {
+    res.setHeader('Cache-Control', 'no-store');
     const list = await store.readJson(rel, []);
     const sorted = (Array.isArray(list) ? list : [])
       .slice()

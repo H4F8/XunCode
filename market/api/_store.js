@@ -54,9 +54,6 @@ async function rest(cfg, command) {
   return j.result;
 }
 
-// ── warm-instance cache ────────────────────────────────────────────────
-const memCache = new Map();
-
 // Rate limiting: tries to claim key for ttlMs via SET NX EX.
 // Returns 0 when claimed, otherwise remaining wait in ms (approx via TTL).
 async function claimRateLimit(keyRel, ttlMs) {
@@ -83,19 +80,15 @@ async function claimRateLimit(keyRel, ttlMs) {
 }
 
 function encodeValue(json) {
-  if (Buffer.byteLength(json, 'utf-8') <= COMPRESS_THRESHOLD) return json;
   const buf = Buffer.from(json, 'utf-8');
-  const candidates = [
-    [MARKS.gz, zlib.gzipSync(buf, { level: 9 })],
-    [MARKS.br, zlib.brotliCompressSync(buf)],
-    ['', buf],
-  ];
-  let best = null;
-  for (const [mark, data] of candidates) {
-    const enc = mark + data.toString('base64');
-    if (best === null || enc.length < best.length) best = enc;
-  }
-  return best;
+  const gz = zlib.gzipSync(buf, { level: 9 });
+  const br = zlib.brotliCompressSync(buf);
+  // base64 inflates binary payloads by ~4/3 — factor that in, plus marker
+  const gzLen = Math.ceil(gz.length * 4 / 3) + MARKS.gz.length;
+  const brLen = Math.ceil(br.length * 4 / 3) + MARKS.br.length;
+  if (buf.length <= gzLen && buf.length <= brLen) return json; // plain, human-readable
+  if (brLen <= gzLen) return MARKS.br + br.toString('base64');
+  return MARKS.gz + gz.toString('base64');
 }
 
 function decodeValue(raw) {
@@ -116,8 +109,8 @@ module.exports = {
     const cfg = restConfig();
     if (!cfg) return readLocal(rel, fallback);
 
-    if (memCache.has(rel)) return memCache.get(rel);
-
+    // NOTE: no read cache here — multiple serverless instances must see each
+    // other's writes immediately (otherwise deleted items "resurrect").
     let raw = null;
     try {
       raw = await rest(cfg, ['get', `${KEY_PREFIX}:${rel}`]);
@@ -125,9 +118,7 @@ module.exports = {
 
     if (raw != null) {
       try {
-        const v = JSON.parse(decodeValue(raw));
-        memCache.set(rel, v);
-        return v;
+        return JSON.parse(decodeValue(raw));
       } catch (_) {}
     }
 
@@ -135,8 +126,7 @@ module.exports = {
     const seeded = readLocal(rel, null);
     if (seeded !== null && !Array.isArray(seeded)) return seeded;
     if (seeded !== null) {
-      memCache.set(rel, seeded);
-      try { await rest(cfg, ['set', `${KEY_PREFIX}:${rel}`, JSON.stringify(seeded)]); } catch (_) {}
+      try { await rest(cfg, ['set', `${KEY_PREFIX}:${rel}`, encodeValue(JSON.stringify(seeded))]); } catch (_) {}
       return seeded;
     }
     return fallback;
@@ -152,7 +142,6 @@ module.exports = {
       fs.mkdirSync(path.dirname(f), { recursive: true });
       fs.writeFileSync(f, JSON.stringify(data, null, 2), 'utf-8');
     } catch (_) {}
-    memCache.set(rel, data);
 
     if (!cfg) return;
 
