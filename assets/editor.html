@@ -83,6 +83,44 @@ require(['vs/editor/editor.main'], function() {
     _definitionCache.set(key, _buildDefinitionIndex(model));
   }
 
+  // Тяжёлый пересчёт индекса нельзя делать на каждый ввод символа —
+  // на больших файлах это и есть основной лаг набора. Дебаунсим.
+  let _defRefreshTimer = null;
+  function _scheduleDefinitionRefresh() {
+    if (_defRefreshTimer) clearTimeout(_defRefreshTimer);
+    _defRefreshTimer = setTimeout(function() {
+      _defRefreshTimer = null;
+      _refreshDefinitionCache();
+    }, 500);
+  }
+
+  // Локальные слова документа: считаем один раз на версию модели,
+  // а не на каждый вызов провайдера (Monaco дёргает его до 3 раз за клик).
+  const _localWordsCache = new Map();
+  function _getLocalWords(model) {
+    const key = model.uri.toString();
+    const version = model.getVersionId();
+    const hit = _localWordsCache.get(key);
+    if (hit && hit.version === version) return hit.promise;
+    const promise = new Promise(function(resolve) {
+      setTimeout(function() {
+        const words = new Set();
+        try {
+          model.findMatches('[A-Za-z_$][\\w$]*', true, true, false, null, false, 20000)
+            .forEach(function(m) { if (m.matches && m.matches[0]) words.add(m.matches[0]); });
+        } catch (_) {}
+        resolve(words);
+      }, 0);
+    });
+    _localWordsCache.set(key, { version: version, promise: promise });
+    // Не даём кэшу разрастаться: держим максимум 8 документов.
+    if (_localWordsCache.size > 8) {
+      const firstKey = _localWordsCache.keys().next().value;
+      if (firstKey !== key) _localWordsCache.delete(firstKey);
+    }
+    return promise;
+  }
+
   function _findDefinition(name) {
     const model = window.editor.getModel();
     if (!model) return null;
@@ -129,9 +167,7 @@ require(['vs/editor/editor.main'], function() {
 
         // Local words from the current document (always on, even when the
         // remote provider is disabled — Monaco's built-in behavior).
-        const words = new Set();
-        const text = model.getValue();
-        text.match(/[A-Za-z_$][\w$]*/g)?.forEach(w => words.add(w));
+        const words = await _getLocalWords(model);
         if (word.word) words.delete(word.word);
         const localItems = Array.from(words).slice(0, 200).map(w => ({
           label: w,
@@ -141,8 +177,9 @@ require(['vs/editor/editor.main'], function() {
         }));
 
         // Remote symbols indexed by Flutter from the rest of the project.
+        // Односимвольные префиксы не оправдывают мост в Dart — пропускаем.
         let remoteItems = [];
-        if (cfg && cfg.enabled !== false && window.flutter_inappwebview) {
+        if (cfg && cfg.enabled !== false && (word.word || '').length >= 2 && window.flutter_inappwebview) {
           try {
             const res = await window.flutter_inappwebview.callHandler('getCompletions', {
               language: model.getLanguageId(),
@@ -208,7 +245,7 @@ require(['vs/editor/editor.main'], function() {
   });
 
   window.editor.onDidChangeModelContent(function() {
-    _refreshDefinitionCache();
+    _scheduleDefinitionRefresh();
   });
 
   _refreshDefinitionCache();

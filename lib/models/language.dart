@@ -121,7 +121,7 @@ const List<Language> builtinLanguages = [
     id: 'nodejs',
     name: 'Node.js',
     version: '20.18.0',
-    url: 'https://nodejs.org/dist/v20.18.0/node-v20.18.0-linux-arm64.tar.xz',
+    url: 'https://nodejs.org/dist/v20.18.0/node-v20.18.0-linux-arm64.tar.gz',
     libManager: 'npm',
     registry: 'https://registry.npmjs.org/',
     launchCommand: './bin/node %file%',

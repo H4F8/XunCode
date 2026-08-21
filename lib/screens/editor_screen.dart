@@ -139,16 +139,24 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 
+  bool _saving = false;
+
   Future<void> _saveActive() async {
-    final filesModel = context.read<OpenFilesModel>();
-    final active = filesModel.active;
-    if (active == null) return;
-    final result = await _webCtrl?.evaluateJavascript(source: 'window.editor.getValue()');
-    if (result == null) return;
-    final content = result is String ? result : result.toString();
-    await FileService.saveFile(active.uri, content);
-    filesModel.markClean(active.uri);
-    PluginRuntime.instance.fireSave(active.uri);
+    if (_saving) return; // не даём автосохранению копиться очередью при наборе
+    _saving = true;
+    try {
+      final filesModel = context.read<OpenFilesModel>();
+      final active = filesModel.active;
+      if (active == null) return;
+      final result = await _webCtrl?.evaluateJavascript(source: 'window.editor.getValue()');
+      if (result == null) return;
+      final content = result is String ? result : result.toString();
+      await FileService.saveFile(active.uri, content);
+      filesModel.markClean(active.uri);
+      PluginRuntime.instance.fireSave(active.uri);
+    } finally {
+      _saving = false;
+    }
   }
 
   Future<void> _toggleTor() async {
@@ -572,6 +580,9 @@ class _EditorScreenState extends State<EditorScreen> {
           transparentBackground: true,
           cacheEnabled: true,
           cacheMode: CacheMode.LOAD_DEFAULT,
+          // Гибридная композиция: без неё на Android ломается IME —
+          // буквы пропускаются или дублируются при быстром наборе.
+          useHybridComposition: true,
         ),
         onWebViewCreated: (ctrl) {
           _webCtrl = ctrl;

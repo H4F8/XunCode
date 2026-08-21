@@ -139,15 +139,20 @@ class LanguageInstallService extends ChangeNotifier {
     try {
       // Распаковка — самая дорогая операция (CPU + IO). Гоним её через
       // compute() в отдельном изоляте, чтобы UI-поток оставался свободным.
-      // Таймаут 120 секунд: типичный JDK/Node tarball на ARM64 ставится
-      // за 30–60 с, всё, что дольше — почти наверняка зависший процесс.
+      // Таймаут 15 минут: rust/jdk тянутся и распаковываются на телефоне
+      // по несколько минут, прежние 120 с рвали установку на середине.
       await compute(_extractInIsolate, <String, String>{
         'archivePath': archivePath,
         'outDir': dir.path,
         'tmpDir': FileService.tmpDir,
-      }).timeout(const Duration(seconds: 120),
-          onTimeout: () => throw 'Extraction timed out (>120s)');
+      }).timeout(const Duration(seconds: 900),
+          onTimeout: () => throw 'Extraction timed out (>15 min)');
       onProgress?.call(1.0, 'Extracting');
+
+      // Защита от «тихих» неудач: пустой результат = ошибка.
+      final hasFiles =
+          dir.existsSync() && dir.listSync(recursive: true).isNotEmpty;
+      if (!hasFiles) throw 'Extraction produced no files';
     } catch (e) {
       await _silent(() => dir.delete(recursive: true));
       throw 'Extraction failed: $e';
@@ -218,6 +223,14 @@ String _extractInIsolate(Map<String, String> args) {
   final tmpDir = args['tmpDir']!;
   final lower = archivePath.toLowerCase();
 
+  // Основной путь — системный tar (toybox на Android, GNU tar на desktop):
+  // стримит с диска, сохраняет симлинки и права исполнения и не грузит
+  // распакованное содержимое в память. Прежний вариант через decodeBuffer()
+  // держал весь распакованный tar в ОЗУ — rust (~1.3 ГБ) или jdk убивался
+  // Android'ом по OOM, и установка «молча» не доходила до конца.
+  final viaTar = _trySystemTar(archivePath, outDir, lower);
+  if (viaTar != null) return viaTar;
+
   Archive archive;
   if (lower.endsWith('.tar.gz') || lower.endsWith('.tgz') ||
       lower.endsWith('.archive')) {
@@ -272,16 +285,64 @@ String _extractInIsolate(Map<String, String> args) {
   }
 }
 
+/// Пытается распаковать системным tar. Возвращает 'ok' при успехе,
+/// null — если tar недоступен или не справился (тогда fallback на Dart).
+String? _trySystemTar(String archivePath, String outDir, String lower) {
+  String flags;
+  if (lower.endsWith('.tar.gz') || lower.endsWith('.tgz')) {
+    flags = '-xzf';
+  } else if (lower.endsWith('.tar.xz') || lower.endsWith('.txz')) {
+    flags = '-xJf'; // на Android xz обычно нет — уйдём в fallback
+  } else if (lower.endsWith('.tar')) {
+    flags = '-xf';
+  } else {
+    return null; // формат не для tar — сразу fallback (zip)
+  }
+  try {
+    final res = Process.runSync('tar', [flags, archivePath, '-C', outDir]);
+    if (res.exitCode == 0 &&
+        Directory(outDir).existsSync() &&
+        Directory(outDir).listSync().isNotEmpty) {
+      return 'ok';
+    }
+  } catch (_) {}
+  return null;
+}
+
 void _writeArchiveSync(Archive archive, String outDir) {
+  final executables = <String>[];
+  final links = <MapEntry<String, String>>[];
   for (final entry in archive) {
-    final outPath = '$outDir/${entry.name}';
+    final name = entry.name.replaceAll('\\', '/');
+    if (name.startsWith('/') || name.contains('../')) continue;
+    final outPath = '$outDir/$name';
+    if (entry.isSymbolicLink) {
+      links.add(MapEntry(outPath, entry.nameOfLinkedFile));
+      continue;
+    }
     if (entry.isFile) {
       final f = File(outPath);
       f.parent.createSync(recursive: true);
       f.writeAsBytesSync(entry.content as List<int>, flush: false);
+      if ((entry.mode & 0o100) != 0) executables.add(outPath);
     } else {
       Directory(outPath).createSync(recursive: true);
     }
+  }
+  // Симлинки: dart:io Link работает и на Android (обычный syscall).
+  for (final l in links) {
+    try {
+      final existing = File(l.key);
+      if (existing.existsSync()) existing.deleteSync();
+      Link(l.key).createSync(l.value);
+    } catch (_) {}
+  }
+  // Права исполнения: без них bin/java, bin/go и т.п. не запускаются.
+  for (var i = 0; i < executables.length; i += 400) {
+    final chunk = executables.skip(i).take(400).toList();
+    try {
+      Process.runSync('chmod', ['755', ...chunk]);
+    } catch (_) {}
   }
 }
 
