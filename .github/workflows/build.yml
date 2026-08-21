@@ -154,6 +154,14 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout for changelog
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate release notes
+        run: .github/scripts/release_notes.sh > release_notes.md
+
       - name: Download Android artifacts
         uses: actions/download-artifact@v4
         with:
@@ -165,4 +173,5 @@ jobs:
         with:
           files: |
             artifacts/android/app-release.apk
-          generate_release_notes: true
+          body_path: release_notes.md
+          generate_release_notes: false
