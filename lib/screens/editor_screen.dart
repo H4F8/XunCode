@@ -68,6 +68,7 @@ class _EditorScreenState extends State<EditorScreen> {
   ActivityBarItem _activeBar = ActivityBarItem.explorer;
   bool _sidebarVisible = true;
   bool _terminalVisible = false;
+  double _terminalHeight = 280;
   String _currentLang = 'plaintext';
   int _line = 1, _col = 1;
   bool _torEnabled = false;
@@ -357,9 +358,13 @@ class _EditorScreenState extends State<EditorScreen> {
                               Expanded(child: _buildEditor(settings)),
                               if (_terminalVisible)
                                 SizedBox(
-                                  height: 280,
+                                  height: _terminalHeight,
                                   child: TerminalPanel(
                                     onClose: _toggleTerminal,
+                                    onHeightDrag: (dy) => setState(() {
+                                      _terminalHeight =
+                                          (_terminalHeight - dy).clamp(140.0, 560.0);
+                                    }),
                                   ),
                                 ),
                             ],

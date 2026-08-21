@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="stylesheet" href="xterm.min.css">
+<script src="xterm.min.js"></script>
+<script src="addon-fit.min.js"></script>
+<script src="addon-web-links.min.js"></script>
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    background: #1e1e1e;
+    overflow: hidden;
+  }
+  #term-container {
+    width: 100%; height: 100%;
+    padding: 4px;
+    box-sizing: border-box;
+    position: relative;
+  }
+  #term-container > div {
+    width: 100%; height: 100%;
+  }
+  .xterm .xterm-viewport::-webkit-scrollbar { width: 6px; }
+  .xterm .xterm-viewport::-webkit-scrollbar-thumb {
+    background: #424242; border-radius: 3px;
+  }
+  .xterm .xterm-viewport::-webkit-scrollbar-track { background: transparent; }
+</style>
+</head>
+<body>
+<div id="term-container"></div>
+<script>
+(function () {
+  'use strict';
+
+  var currentId = null;
+  var terms = {}; // id -> {term, fit, container}
+
+  function theme() {
+    return {
+      background: '#1e1e1e',
+      foreground: '#cccccc',
+      cursor: '#aeafad',
+      cursorAccent: '#1e1e1e',
+      selectionBackground: '#264f78',
+      black: '#000000',
+      red: '#cd3131',
+      green: '#0dbc79',
+      yellow: '#e5e510',
+      blue: '#2472c8',
+      magenta: '#bc3fbc',
+      cyan: '#11a8cd',
+      white: '#e5e5e5',
+      brightBlack: '#666666',
+      brightRed: '#f14c4c',
+      brightGreen: '#23d18b',
+      brightYellow: '#f5f543',
+      brightBlue: '#3b8eea',
+      brightMagenta: '#d670d6',
+      brightCyan: '#29b8db',
+      brightWhite: '#ffffff'
+    };
+  }
+
+  function fitSafe(t) { try { t.fit.fit(); } catch (e) {} }
+
+  function create(id, cols, rows) {
+    if (terms[id]) return;
+    var container = document.createElement('div');
+    container.style.display = 'none';
+    document.getElementById('term-container').appendChild(container);
+
+    var term = new window.Terminal({
+      fontSize: 12,
+      lineHeight: 1.1,
+      fontFamily: "'Droid Sans Mono', 'Cutive Mono', monospace",
+      cursorBlink: true,
+      scrollback: 5000,
+      theme: theme(),
+      allowProposedApi: true,
+      convertEol: false
+    });
+    if (cols && rows) term.resize(cols, rows);
+
+    var fit = new FitAddon.FitAddon();
+    term.loadAddon(fit);
+    try {
+      term.loadAddon(new WebLinksAddon.WebLinksAddon());
+    } catch (e) {}
+    term.open(container);
+    setTimeout(function () { fitSafe({fit: fit}); }, 30);
+
+    term.onData(function (d) {
+      window.flutter_inappwebview.callHandler('termData', d);
+    });
+    term.onResize(function (sz) {
+      window.flutter_inappwebview.callHandler('termResize', sz.cols, sz.rows);
+    });
+
+    if (window.ResizeObserver) {
+      new ResizeObserver(function () { fitSafe({fit: fit}); }).observe(container);
+    }
+
+    terms[id] = { term: term, fit: fit, container: container };
+    if (!currentId) show(id);
+  }
+
+  function show(id) {
+    Object.keys(terms).forEach(function (k) {
+      terms[k].container.style.display = (k === id) ? 'block' : 'none';
+    });
+    currentId = id;
+    var t = terms[id];
+    if (t) {
+      t.term.focus();
+      setTimeout(function () { fitSafe(t); }, 60);
+    }
+  }
+
+  // Пишем только в активный терминал: неактивные буферизуются на стороне Dart.
+  function write(data) {
+    var t = terms[currentId];
+    if (t) t.term.write(data);
+  }
+
+  function closeTerm(id) {
+    var t = terms[id];
+    if (!t) return;
+    try { t.term.dispose(); } catch (e) {}
+    t.container.remove();
+    delete terms[id];
+    if (currentId === id) {
+      var rest = Object.keys(terms);
+      if (rest.length > 0) show(rest[rest.length - 1]);
+      else currentId = null;
+    }
+  }
+
+  window.termApi = {
+    create: create,
+    show: show,
+    write: write,
+    closeTerm: closeTerm,
+    setFontSize: function (px) {
+      Object.keys(terms).forEach(function (k) {
+        terms[k].term.options.fontSize = px;
+      });
+      if (currentId && terms[currentId]) fitSafe(terms[currentId]);
+    },
+    refitAll: function () {
+      Object.keys(terms).forEach(function (k) { fitSafe(terms[k]); });
+    }
+  };
+
+  window.flutter_inappwebview.callHandler('termReady');
+})();
+</script>
+</body>
+</html>
