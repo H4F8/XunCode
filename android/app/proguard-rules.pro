@@ -22,6 +22,10 @@
 # file_picker
 -keep class com.mr.flutter.plugin.filepicker.** { *; }
 
+# Play Core отсутствует в зависимостях (deferred components не используются),
+# но классы Flutter embedding ссылаются на него — просто глушим предупреждения.
+-dontwarn com.google.android.play.core.**
+
 # Kotlin / coroutines
 -keep class kotlin.** { *; }
 -keep class kotlinx.** { *; }
