@@ -26,6 +26,7 @@ const routes = {
   ideas: {
     submit: () => require('./_h/ideas/submit'),
     list: () => require('./_h/ideas/list'),
+    delete: () => require('./_h/ideas/delete'),
   },
   auth: {
     start: () => require('./_h/auth/start'),

@@ -59,4 +59,22 @@ async function checkAdmin(req, body) {
   return { ok: true };
 }
 
-module.exports = { verifyGhToken, adminLogins, checkAdmin, hmac };
+// Verifies the request carries a valid signed GitHub session and returns its
+// payload ({login,name,avatar,admin,created,exp}) or null.
+function requireGhUser(req, body) {
+  const secret = process.env.AUTH_SECRET || process.env.ADMIN_API_KEY;
+  if (!secret) return null;
+  const token =
+    req.headers['x-gh-token'] || (body && typeof body === 'object' ? body.ghToken : undefined);
+  return verifyGhToken(token, secret);
+}
+
+// Minimum GitHub account age for public write actions (anti-abuse).
+const MIN_ACCOUNT_AGE_MS = 90 * 24 * 60 * 60 * 1000;
+
+function accountTooYoung(user) {
+  if (!user || !user.created) return true; // old session without created_at → re-login
+  return Date.now() - Date.parse(user.created) < MIN_ACCOUNT_AGE_MS;
+}
+
+module.exports = { verifyGhToken, adminLogins, checkAdmin, hmac, requireGhUser, accountTooYoung };

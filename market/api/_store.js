@@ -22,8 +22,10 @@ const path = require('path');
 const zlib = require('zlib');
 
 const KEY_PREFIX = process.env.UPSTASH_KEY_PREFIX || 'xuncode-market';
-const COMPRESS_THRESHOLD = parseInt(process.env.UPSTASH_COMPRESS_OVER || '512', 10);
-const GZ_MARK = 'gz:';
+// Values at or below this size are stored as-is; larger ones are compressed
+// with whichever representation (gzip / brotli / plain) turns out smallest.
+const COMPRESS_THRESHOLD = parseInt(process.env.UPSTASH_COMPRESS_OVER || '0', 10);
+const MARKS = { gz: 'gz:', br: 'br:' };
 
 function restConfig() {
   const url = process.env.UPSTASH_REDIS_REST_URL;
@@ -55,20 +57,60 @@ async function rest(cfg, command) {
 // ── warm-instance cache ────────────────────────────────────────────────
 const memCache = new Map();
 
+// Rate limiting: tries to claim key for ttlMs via SET NX EX.
+// Returns 0 when claimed, otherwise remaining wait in ms (approx via TTL).
+async function claimRateLimit(keyRel, ttlMs) {
+  const cfg = restConfig();
+  if (!cfg) return 0; // no limiter without redis
+  const key = `${KEY_PREFIX}:${keyRel}`;
+  try {
+    const set = await rest(cfg, ['set', key, Date.now().toString(), 'NX', 'EX',
+      String(Math.max(1, Math.ceil(ttlMs / 1000)))]);
+    if (set === 'OK' || set === true || set === 1) return 0;
+    let ttl = 0;
+    try { ttl = Number(await rest(cfg, ['ttl', key])) || 0; } catch (_) {}
+    if (ttl <= 0) {
+      // expired between calls — retry once
+      const again = await rest(cfg, ['set', key, Date.now().toString(), 'NX', 'EX',
+        String(Math.max(1, Math.ceil(ttlMs / 1000)))]);
+      if (again === 'OK' || again === true || again === 1) return 0;
+      try { ttl = Number(await rest(cfg, ['ttl', key])) || 0; } catch (_) {}
+    }
+    return Math.max(1, ttl) * 1000;
+  } catch (_) {
+    return 0; // redis hiccup → don't block users
+  }
+}
+
 function encodeValue(json) {
-  if (Buffer.byteLength(json, 'utf-8') < COMPRESS_THRESHOLD) return json;
-  return GZ_MARK + zlib.gzipSync(json).toString('base64');
+  if (Buffer.byteLength(json, 'utf-8') <= COMPRESS_THRESHOLD) return json;
+  const buf = Buffer.from(json, 'utf-8');
+  const candidates = [
+    [MARKS.gz, zlib.gzipSync(buf, { level: 9 })],
+    [MARKS.br, zlib.brotliCompressSync(buf)],
+    ['', buf],
+  ];
+  let best = null;
+  for (const [mark, data] of candidates) {
+    const enc = mark + data.toString('base64');
+    if (best === null || enc.length < best.length) best = enc;
+  }
+  return best;
 }
 
 function decodeValue(raw) {
-  if (typeof raw === 'string' && raw.startsWith(GZ_MARK)) {
-    return zlib.gunzipSync(Buffer.from(raw.slice(GZ_MARK.length), 'base64')).toString('utf-8');
+  if (typeof raw === 'string' && raw.startsWith(MARKS.br)) {
+    return zlib.brotliDecompressSync(Buffer.from(raw.slice(MARKS.br.length), 'base64')).toString('utf-8');
+  }
+  if (typeof raw === 'string' && raw.startsWith(MARKS.gz)) {
+    return zlib.gunzipSync(Buffer.from(raw.slice(MARKS.gz.length), 'base64')).toString('utf-8');
   }
   return raw;
 }
 
 module.exports = {
   redisMode: () => restConfig() !== null,
+  claimRateLimit,
 
   async readJson(rel, fallback) {
     const cfg = restConfig();

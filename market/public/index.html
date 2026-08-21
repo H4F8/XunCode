@@ -575,15 +575,19 @@ footer {
       Есть идея для XunCode или плагина? Напишите — разработчик прочитает каждую.
     </p>
 
-    <div class="form-group">
-      <label>Ник (необязательно)</label>
-      <input id="i-author" maxlength="40" placeholder="@handle" />
+    <div id="ideas-login-hint" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:16px;">
+      <p style="color:var(--fg);font-size:13px;margin-bottom:10px;">
+        Предлагать идеи могут пользователи, вошедшие через GitHub (аккаунт старше 3 месяцев).
+      </p>
+      <button class="btn btn-sm" onclick="location.href='/api/auth/start'">Войти через GitHub</button>
     </div>
-    <div class="form-group">
-      <label>Идея *</label>
-      <textarea id="i-text" rows="4" maxlength="2000" placeholder="Что улучшить, добавить или изменить?"></textarea>
+    <div id="ideas-form-wrap">
+      <div class="form-group">
+        <label>Идея * <span style="text-transform:none;color:var(--fg-muted)" id="i-as"></span></label>
+        <textarea id="i-text" rows="4" maxlength="2000" placeholder="Что улучшить, добавить или изменить?"></textarea>
+      </div>
+      <button class="btn" id="i-submit">Отправить идею</button>
     </div>
-    <button class="btn" id="i-submit">Отправить идею</button>
 
     <h2 style="color:var(--green); font-size:14px; margin-top:32px; text-transform:uppercase; letter-spacing:.5px;">
       Предложенные идеи (<span id="ideas-count">0</span>)
@@ -825,10 +829,12 @@ document.getElementById('s-submit')?.addEventListener('click', async () => {
     toast('Заполните название и ссылку на GitHub', true);
     return;
   }
+  const u = getGhUser();
+  if (!(u && u.login)) { toast(ideaErrorText('auth_required'), true); return; }
   try {
     const r = await fetch('/api/admin/submit', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'x-gh-token': localStorage.getItem('gh_token') || '' },
       body: JSON.stringify(body),
     });
     const data = await r.json();
@@ -838,6 +844,10 @@ document.getElementById('s-submit')?.addEventListener('click', async () => {
         const el = document.getElementById(id);
         if (el) el.value = '';
       });
+    } else if (data.error === 'account_age') {
+      toast(ideaErrorText('account_age'), true);
+    } else if (data.error === 'plugin.json not reachable on main or master branch') {
+      toast('В репозитории нет plugin.json на main/master', true);
     } else {
       toast(data.error || 'Ошибка отправки', true);
     }
@@ -860,11 +870,13 @@ async function loadIdeas() {
       list.innerHTML = '<div class="empty" style="padding:20px">Идей пока нет — будь первым!</div>';
       return;
     }
+    const me = getGhUser();
     list.innerHTML = ideas.map(i => `
       <div class="review-item">
         <div class="review-header">
           <span class="author">💡 ${esc(i.author || 'Аноним')}</span>
           <span class="date">${esc((i.date || '').slice(0, 10))}</span>
+          ${me && me.admin ? `<button class="btn btn-sm btn-danger" onclick="deleteIdea('${esc(i.id)}', this)">✕</button>` : ''}
         </div>
         <div class="review-text">${esc(i.text || '')}</div>
       </div>
@@ -874,34 +886,58 @@ async function loadIdeas() {
   }
 }
 
-document.getElementById('i-submit')?.addEventListener('click', async () => {
-  const user = getGhUser();
-  const body = {
-    author: user ? '@' + user.login : document.getElementById('i-author')?.value?.trim() || '',
-    text: document.getElementById('i-text').value.trim(),
-  };
-  if (!body.text) {
-    toast('Опишите идею', true);
-    return;
+function ideaErrorText(err) {
+  if (err === 'auth_required') return 'Войдите через GitHub, чтобы предлагать идеи';
+  if (err === 'account_age') return 'Аккаунту GitHub должно быть больше 3 месяцев';
+  if (err && err.startsWith('rate_limited')) {
+    const min = (JSON.parse(localStorage.getItem('idea_rl') || '{}').retryAfterMin);
+    return `Не так часто — попробуйте через ${min ? min + ' мин' : 'пару минут'}`;
   }
+  if (err === 'text required') return 'Опишите идею';
+  return err === undefined || err === null ? 'Ошибка отправки' : String(err);
+}
+
+async function submitIdea() {
+  const user = getGhUser();
+  if (!(user && user.login)) { toast(ideaErrorText('auth_required'), true); return; }
+  const text = document.getElementById('i-text')?.value?.trim() || '';
+  if (!text) { toast(ideaErrorText('text required'), true); return; }
   try {
     const r = await fetch('/api/ideas/submit', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
+      headers: { 'content-type': 'application/json', 'x-gh-token': localStorage.getItem('gh_token') || '' },
+      body: JSON.stringify({ text }),
     });
-    const data = await r.json();
+    const data = await r.json().catch(() => ({}));
     if (r.ok && data.ok) {
       toast('✅ Идея отправлена, спасибо!');
       document.getElementById('i-text').value = '';
       loadIdeas();
     } else {
-      toast(data.error || 'Ошибка отправки', true);
+      if (data.error === 'rate_limited') localStorage.setItem('idea_rl', JSON.stringify(data));
+      toast(ideaErrorText(data.error), true);
     }
   } catch (_) {
     toast('Ошибка сети', true);
   }
-});
+}
+
+async function deleteIdea(id, btn) {
+  if (!confirm('Удалить эту идею?')) return;
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/ideas/delete', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-gh-token': localStorage.getItem('gh_token') || '' },
+      body: JSON.stringify({ id }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (r.ok && data.ok) { toast('Идея удалена'); loadIdeas(); }
+    else { toast(data.error || 'Ошибка удаления', true); btn.disabled = false; }
+  } catch (_) { toast('Ошибка сети', true); btn.disabled = false; }
+}
+
+document.getElementById('i-submit')?.addEventListener('click', submitIdea);
 
 // ── GitHub auth ──────────────────────────────────────────────────────
 function getGhUser() {
@@ -923,6 +959,16 @@ function updateAuthUi() {
       `<button class="btn btn-outline btn-sm" onclick="location.href='/api/auth/start'">Войти через GitHub</button>`;
   }
   if (adminBtn) adminBtn.style.display = user && user.admin ? '' : 'none';
+
+  const wrap = document.getElementById('ideas-form-wrap');
+  const hint = document.getElementById('ideas-login-hint');
+  const asEl = document.getElementById('i-as');
+  if (wrap && hint) {
+    const ok = !!(user && user.login);
+    wrap.style.display = ok ? '' : 'none';
+    hint.style.display = ok ? 'none' : '';
+    if (ok && asEl) asEl.textContent = '— от @' + user.login;
+  }
 }
 
 function ghLogout() {

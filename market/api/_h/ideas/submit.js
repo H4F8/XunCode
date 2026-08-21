@@ -1,13 +1,17 @@
 // /api/ideas/submit
-//   GET  → returns all ideas (newest first)
-//   POST { author?, text } → adds an idea
+//   GET  → returns all ideas (newest first), public
+//   POST { text } → adds an idea. Restrictions:
+//     • valid signed GitHub session required (x-gh-token header or ghToken)
+//     • GitHub account must be older than 90 days (anti-abuse)
+//     • per-login cooldown (IDEA_COOLDOWN_MIN, default 10 minutes)
 //
-// Storage via api/_store.js — GitHub Contents API in production, fs locally.
+// Storage via api/_store.js — Upstash Redis in production, fs locally.
 
 const store = require('../../_store.js');
+const { requireGhUser, accountTooYoung } = require('../../_admin.js');
 
 const MAX_IDEA_LEN = 2000;
-const MAX_AUTHOR_LEN = 40;
+const COOLDOWN_MS = (parseInt(process.env.IDEA_COOLDOWN_MIN || '10', 10) || 10) * 60 * 1000;
 
 module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -31,13 +35,26 @@ module.exports = async (req, res) => {
     if (typeof body === 'string') {
       try { body = JSON.parse(body); } catch (_) { body = {}; }
     }
-    const { author, text } = body || {};
-    const cleanText = typeof text === 'string' ? text.trim().slice(0, MAX_IDEA_LEN) : '';
-    if (!cleanText) return res.status(400).json({ error: 'text required' });
-    const cleanAuthor =
-      typeof author === 'string' && author.trim()
-        ? author.trim().slice(0, MAX_AUTHOR_LEN)
-        : 'Anonymous';
+
+    const user = requireGhUser(req, body);
+    if (!user || !user.login) {
+      return res.status(401).json({ error: 'auth_required' });
+    }
+    if (accountTooYoung(user)) {
+      return res.status(403).json({ error: 'account_age', minDays: 90 });
+    }
+
+    const waitMs = await store.claimRateLimit(`rl:idea:${user.login.toLowerCase()}`, COOLDOWN_MS);
+    if (waitMs > 0) {
+      return res.status(429).json({
+        error: 'rate_limited',
+        retryAfterMin: Math.ceil(waitMs / 60000),
+        limitMin: Math.round(COOLDOWN_MS / 60000),
+      });
+    }
+
+    const text = typeof body?.text === 'string' ? body.text.trim().slice(0, MAX_IDEA_LEN) : '';
+    if (!text) return res.status(400).json({ error: 'text required' });
 
     let list = await store.readJson(rel, []);
     if (!Array.isArray(list)) {
@@ -45,8 +62,9 @@ module.exports = async (req, res) => {
     }
     list.push({
       id: 'i_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36),
-      author: cleanAuthor,
-      text: cleanText,
+      author: '@' + user.login,
+      login: user.login,
+      text,
       date: new Date().toISOString(),
     });
 

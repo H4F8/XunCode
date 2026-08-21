@@ -85,6 +85,7 @@ module.exports = async (req, res) => {
     login: String(profile.login || ''),
     name: String(profile.name || profile.login || ''),
     avatar: String(profile.avatar_url || ''),
+    created: String(profile.created_at || ''),
     admin: adminLogins().includes(String(profile.login || '').toLowerCase()),
     exp: Date.now() + SESSION_TTL_MS,
   });

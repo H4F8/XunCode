@@ -12,6 +12,7 @@
 // /api/admin/approve.
 
 const store = require('../../_store.js');
+const { requireGhUser, accountTooYoung } = require('../../_admin.js');
 
 module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -22,6 +23,14 @@ module.exports = async (req, res) => {
   if (typeof body === 'string') {
     try { body = JSON.parse(body); } catch (_) { body = {}; }
   }
+  const user = requireGhUser(req, body);
+  if (!user || !user.login) {
+    return res.status(401).json({ error: 'auth_required' });
+  }
+  if (accountTooYoung(user)) {
+    return res.status(403).json({ error: 'account_age', minDays: 90 });
+  }
+
   const { githubUrl, name } = body || {};
 
   if (!githubUrl || typeof githubUrl !== 'string') {
@@ -76,9 +85,7 @@ module.exports = async (req, res) => {
       (manifest && (manifest.description || manifest.desc)) ||
       '',
     author:
-      (typeof body?.author === 'string' && body.author) ||
-      (manifest && manifest.author) ||
-      owner,
+      '@' + user.login,
     githubUrl: cleaned,
     tags: Array.isArray(manifest?.tags) ? manifest.tags : [],
     permissions: Array.isArray(manifest?.permissions)
