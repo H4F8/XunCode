@@ -39,6 +39,11 @@ class SettingsService {
   bool get alpineInstalled => _prefs.getBool('alpine.installed') ?? false;
   Future<void> setAlpineInstalled(bool v) => _prefs.setBool('alpine.installed', v);
 
+  /// Красный огонёк мягкого обновления. Гасится просмотром диалога
+  /// или обновлением, зажигается при появлении нового релиза.
+  bool get hasUpdate => _prefs.getBool('update.has_update') ?? false;
+  Future<void> setHasUpdate(bool v) => _prefs.setBool('update.has_update', v);
+
   Future<void> set<T>(String key, T value) async {
     if (value is String) await _prefs.setString(key, value);
     else if (value is bool) await _prefs.setBool(key, value);

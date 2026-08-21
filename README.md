@@ -16,8 +16,6 @@ XunCode is a native, cross-platform code editor that brings a desktop-like editi
 - **Settings** — configurable font size, font family, tab size, word wrap, auto-save, and completion behavior.
 - **File tabs** — open multiple files, switch between them, and track unsaved changes.
 - **Project sidebar** — browse the projects directory, open files, and navigate the workspace.
-- **Command palette** — trigger plugin commands from a searchable list.
-- **Status bar** — cursor line/column, active language, and quick Tor toggle.
 
 ### Terminal
 - **proot + Alpine Linux** — a full user-space Linux environment (no root required).
@@ -30,21 +28,38 @@ XunCode is a native, cross-platform code editor that brings a desktop-like editi
 - **GitHub-based plugins** — install any public repository that contains `plugin.json` + `main.js`.
 - **Sandboxed execution** — plugins run inside an isolated `HeadlessInAppWebView` with a permission model.
 - **Plugin API** — JavaScript API covering editor access, file system, HTTP requests, terminal/process execution, settings, storage, workspace search, and UI prompts.
-- **Marketplace** — browse, install, and review plugins (backend can be self-hosted or deployed on Vercel).
-- **Runtime management** — activate, deactivate, reload, and uninstall plugins without restarting the app.
+- **Marketplace** — browse and install plugins from the built-in catalog.
 
-### Customization and runtimes
+### Customization
 - **UI language packs** — Russian and English are bundled; additional languages can be added by placing `.txt` files in `Shared/XunCode/Languages/`.
 - **Language / runtime installer** — download and install development runtimes such as Python, Node.js, Go, Rust, Ruby, Lua, PHP, Java, or any custom URL.
 - **Theme** — VS Code Dark+-inspired color theme with a consistent visual style across the app.
 
-### Networking
-- **Proxy support** — HTTP/HTTPS and SOCKS5 proxy configuration.
-- **Tor via Orbot** — start/stop Orbot directly from the status bar.
-
 ### Platforms
 - **Android** — primary target. Minimum SDK 26, recommended Android 10+ (API 29+). Android 13+ support is stabilized through `libaxs.so` and `libproot.so` placed in `jniLibs`.
 - **Linux** — desktop build is supported via Flutter's Linux target. The terminal uses the native system shell instead of proot, and the plugin sandbox works out of the box.
+
+### Smart updates (GitHub Releases)
+XunCode has a self-contained update engine with no backend: everything is driven by the release notes published in the [H4F8 releases](https://github.com/H4F8/XunCode/releases).
+
+- **Soft update** — a new feature release shows a red badge on the Settings gear and inside *Settings → Software Update*. Opening the dialog shows the release changelog rendered as Markdown; closing it silences the badge until the next release.
+- **Hard update** — for critical security fixes the first line of the release body contains a marker:
+  ```
+  [HARD UPDATE: GITHUB, RUSTORE]
+  ```
+  The listed install sources get their IDE fully blocked by a full-screen warning with the developer's changelog text; the Back button exits the app entirely. A single **UPDATE NOW** button opens either the direct APK/desktop asset download from the latest release (`browser_download_url`) or the XunCode page inside RuStore.
+- **Install-source detection** — on Android the app detects whether it was installed from RuStore (`ru.vk.store`) or elsewhere (GitHub APK / sideload) via `PackageManager.getInstallSourceInfo()`. Desktop builds are always treated as `PC`. While a build is still under RuStore moderation, simply omit `RUSTORE` from the marker — store users will only see the soft badge until you edit the release text.
+- **Offline-first safety** — if the network is unavailable or GitHub is unreachable, the check silently fails and the editor keeps working offline. No update logic ever blocks an offline user.
+
+## Coming soon
+
+These features are planned but not ready yet:
+
+- **Marketplace reviews** — plugin ratings and community reviews in the built-in market.
+- **Proxy support** — HTTP/HTTPS and SOCKS5 proxy configuration.
+- **Tor via Orbot** — start/stop Orbot directly from the status bar.
+- **In-app auto-download & install** — one-tap background download of update packages instead of opening a browser/store link.
+- **Git repo sync in settings** — cloning and pushing repositories straight from the app UI.
 
 ## Requirements
 
@@ -116,6 +131,16 @@ XunCode/
 └── README.md
 ```
 
+## Publishing a release (for maintainers)
+
+1. Push a tag / create a Release in the repo and attach the built APK/AppImage assets.
+2. For a regular release write free-form Markdown — users get the soft badge.
+3. For a critical release make the **first line** of the body:
+   ```
+   [HARD UPDATE: GITHUB]
+   ```
+   Add `RUSTORE` to the list only after the build passes moderation, then just edit the release text — the block activates instantly for store users.
+
 ## Plugin API
 
 See the full reference in [docs/PLUGIN_API.md](docs/PLUGIN_API.md). Example plugins are located in [example-plugins/](example-plugins/).
@@ -132,7 +157,7 @@ Pull requests, bug reports, and feature ideas are welcome.
 
 - **Acode Foundation** — for the noexec bypass approach on Android 13+ and ready-to-use proot binaries. Repository: [Acode-Foundation/Acode](https://github.com/Acode-Foundation/Acode)
 - **bajrangCoder** for **acodex_server (AXS)** — code execution on Android 13+ via `memfd_create`. Repository: [bajrangCoder/acodex_server](https://github.com/bajrangCoder/acodex_server)
-- **PRoot** — user-space chroot without root: [proot-me/proot](https://github.com/proot-me/proot)
+- **PRoot** — user-space chroot without root: [proot-me/proot](https://proot-me.github.io)
 - **Alpine Linux** — lightweight Linux for the terminal: [alpinelinux.org](https://alpinelinux.org)
 - **Monaco Editor** — the code editor engine: [microsoft/monaco-editor](https://github.com/microsoft/monaco-editor)
 

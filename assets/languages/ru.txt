@@ -96,7 +96,22 @@ settings.section.plugins=Плагины
 settings.section.network=Сеть
 settings.section.storage=Хранилище
 settings.section.developer=Разработчик
+settings.section.updates=Обновление программы
 settings.section.about=О приложении
+
+# Обновления (GitHub Releases)
+update.title=Доступна новая версия!
+update.hard_title=Критическое обновление безопасности
+update.hard_subtitle=Ваша версия {version} уязвима. Обновление обязательно: без него редактор заблокирован.
+update.update=Обновить
+update.update_now=ОБНОВИТЬ
+update.later=Позже / Закрыть
+update.current=(у вас {version})
+update.check_failed=Не удалось проверить обновления. Проверьте интернет.
+update.up_to_date=Установлена последняя версия XunCode
+update.error_launch=Не удалось открыть ссылку обновления
+settings.updates=Обновление программы
+settings.updates_subtitle=Проверить наличие новой версии XunCode
 
 # Пункты настроек
 settings.theme=Тема

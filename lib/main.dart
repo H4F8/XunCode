@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import 'app/theme.dart';
 import 'models/open_file.dart';
 import 'models/settings_model.dart';
+import 'models/update_model.dart';
+import 'screens/hard_update_screen.dart';
 import 'services/file_service.dart';
 import 'services/language_install_service.dart';
 import 'services/language_service.dart';
@@ -27,6 +29,7 @@ void main() async {
         ChangeNotifierProvider.value(value: language),
         ChangeNotifierProvider.value(value: installer),
         ChangeNotifierProvider(create: (_) => OpenFilesModel()),
+        ChangeNotifierProvider(create: (_) => UpdateModel()),
       ],
       child: const XunCodeApp(),
     ),
@@ -53,7 +56,54 @@ class XunCodeApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      home: const EditorScreen(),
+      home: const _UpdateGate(child: EditorScreen()),
     );
+  }
+}
+
+/// Запускает фоновую проверку обновлений после первого кадра и, если
+/// найден критический релиз для платформы пользователя, перекрывает IDE
+/// экраном тотальной блокировки. Мягкое обновление просто зажигает огонёк.
+class _UpdateGate extends StatefulWidget {
+  final Widget child;
+
+  const _UpdateGate({required this.child});
+
+  @override
+  State<_UpdateGate> createState() => _UpdateGateState();
+}
+
+class _UpdateGateState extends State<_UpdateGate> {
+  @override
+  void initState() {
+    super.initState();
+    // Даём IDE открыться мгновенно; проверка идёт в фоне.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final model = context.read<UpdateModel>();
+      await model.check();
+      _maybeShowHardBlock(model);
+    });
+  }
+
+  void _maybeShowHardBlock(UpdateModel model) {
+    if (!model.needsHardBlock || model.hardShown) return;
+    final result = model.result;
+    if (result == null) return;
+    model.markHardShown();
+    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => HardUpdateScreen(result: result),
+        transitionDuration: const Duration(milliseconds: 250),
+        transitionsBuilder: (_, animation, __, child) =>
+            FadeTransition(opacity: animation, child: child),
+      ),
+      (_) => false,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.child;
   }
 }

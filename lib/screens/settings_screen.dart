@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../app/theme.dart';
 import '../models/github_user.dart';
 import '../models/settings_model.dart';
+import '../models/update_model.dart';
 import '../services/file_service.dart';
 import '../services/github_oauth_service.dart';
 import '../services/language_service.dart';
@@ -13,6 +14,8 @@ import '../services/platform_info.dart';
 import '../services/plugin_runtime.dart';
 import '../services/plugin_service.dart';
 import '../services/terminal_service.dart';
+import '../services/update_service.dart';
+import '../widgets/update_dialog.dart';
 import 'about_screen.dart';
 import 'github_signin_screen.dart';
 import 'installed_plugins_screen.dart';
@@ -33,12 +36,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _sharedPublic = false;
   String _sharedPath = '';
   String _privatePath = '';
+  String _appVersion = '';
 
   @override
   void initState() {
     super.initState();
     _loadGithub();
     _loadStorage();
+    _loadAppVersion();
+  }
+
+  Future<void> _loadAppVersion() async {
+    final v = await UpdateService.appVersion();
+    if (!mounted) return;
+    setState(() => _appVersion = v);
   }
 
   Future<void> _loadStorage() async {
@@ -283,8 +294,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               (v) => s.set('developerMode', v)),
           if (s.developerMode) _devModePanel(context, lang),
 
+          _section(lang.tr('settings.section.updates')),
+          _buildUpdateTile(context, lang),
+
           _section(lang.tr('settings.section.about')),
-          _info(lang.tr('settings.about.version'), '1.0.0'),
+          _info(lang.tr('settings.about.version'),
+              _appVersion.isEmpty ? '…' : _appVersion),
           _info(lang.tr('settings.about.platform'), lang.tr('settings.about.platform_value')),
           ListTile(
             tileColor: VscodeTheme.bgSidebar,
@@ -408,6 +423,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ],
     );
+  }
+
+  /// Пункт «Обновление программы»: свежая проверка при клике, диалог с
+  /// changelog'ом последнего релиза, красный огонёк пока не просмотрено.
+  Widget _buildUpdateTile(BuildContext context, LanguageService lang) {
+    final hasBadge = context.watch<UpdateModel>().hasSoftBadge;
+    return ListTile(
+      tileColor: VscodeTheme.bgSidebar,
+      dense: true,
+      leading: const Icon(Icons.system_update_alt,
+          size: 18, color: VscodeTheme.accent),
+      title: Text(lang.tr('settings.updates'),
+          style: const TextStyle(color: VscodeTheme.fg, fontSize: 13)),
+      subtitle: Text(lang.tr('settings.updates_subtitle'),
+          style: const TextStyle(color: VscodeTheme.fgMuted, fontSize: 11)),
+      trailing: hasBadge
+          ? Container(
+              width: 9,
+              height: 9,
+              decoration: BoxDecoration(
+                color: Colors.red.shade600,
+                shape: BoxShape.circle,
+              ),
+            )
+          : const Icon(Icons.chevron_right,
+              size: 16, color: VscodeTheme.fgMuted),
+      onTap: () => _openUpdateDialog(context),
+    );
+  }
+
+  Future<void> _openUpdateDialog(BuildContext context) async {
+    final lang = LanguageService.of(context, listen: false);
+    // Свежая проверка прямо по клику — офлайн просто покажем ошибку.
+    final res = await UpdateService.check();
+    if (!mounted) return;
+    if (res == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(lang.tr('update.check_failed')),
+        backgroundColor: VscodeTheme.red,
+      ));
+      return;
+    }
+    if (!res.hasUpdate) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(lang.tr('update.up_to_date')),
+        backgroundColor: VscodeTheme.accent,
+      ));
+      await context.read<UpdateModel>().dismissSoft();
+      return;
+    }
+    await UpdateDialog.show(context, res);
+    if (!mounted) return;
+    // Закрытие диалога любым способом гасит огонёк до следующего релиза.
+    await context.read<UpdateModel>().dismissSoft();
   }
 
   Widget _buildStorageInfo(LanguageService lang) {

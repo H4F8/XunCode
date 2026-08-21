@@ -7,8 +7,14 @@ enum ActivityBarItem { explorer, search, extensions, settings }
 class ActivityBar extends StatelessWidget {
   final ActivityBarItem selected;
   final ValueChanged<ActivityBarItem> onSelect;
+  final bool settingsBadge;
 
-  const ActivityBar({super.key, required this.selected, required this.onSelect});
+  const ActivityBar({
+    super.key,
+    required this.selected,
+    required this.onSelect,
+    this.settingsBadge = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -23,14 +29,16 @@ class ActivityBar extends StatelessWidget {
           _item(ActivityBarItem.search, Icons.search, lang.tr('activity.search')),
           _item(ActivityBarItem.extensions, Icons.extension_outlined, lang.tr('activity.extensions')),
           const Spacer(),
-          _item(ActivityBarItem.settings, Icons.settings_outlined, lang.tr('activity.settings')),
+          _item(ActivityBarItem.settings, Icons.settings_outlined, lang.tr('activity.settings'),
+              badge: settingsBadge),
           const SizedBox(height: 8),
         ],
       ),
     );
   }
 
-  Widget _item(ActivityBarItem item, IconData icon, String tooltip) {
+  Widget _item(ActivityBarItem item, IconData icon, String tooltip,
+      {bool badge = false}) {
     final isSelected = selected == item;
     return Tooltip(
       message: tooltip,
@@ -48,10 +56,29 @@ class ActivityBar extends StatelessWidget {
               ),
             ),
           ),
-          child: Icon(
-            icon,
-            size: 22,
-            color: isSelected ? VscodeTheme.fg : VscodeTheme.fgMuted,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 22,
+                color: isSelected ? VscodeTheme.fg : VscodeTheme.fgMuted,
+              ),
+              if (badge)
+                Positioned(
+                  right: 9,
+                  top: 9,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade600,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ),

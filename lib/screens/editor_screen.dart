@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../app/theme.dart';
 import '../models/open_file.dart';
 import '../models/settings_model.dart';
+import '../models/update_model.dart';
 import '../services/completion_service.dart';
 import '../services/file_service.dart';
 import '../services/language_service.dart';
@@ -325,7 +326,8 @@ class _EditorScreenState extends State<EditorScreen> {
         Expanded(
           child: Row(
             children: [
-              ActivityBar(selected: _activeBar, onSelect: _onActivityBarSelect),
+              ActivityBar(selected: _activeBar, onSelect: _onActivityBarSelect,
+                  settingsBadge: context.watch<UpdateModel>().hasSoftBadge),
               Expanded(
                 child: Stack(
                   children: [
@@ -471,6 +473,7 @@ class _EditorScreenState extends State<EditorScreen> {
 
   Widget _buildPhoneNav() {
     final lang = LanguageService.of(context);
+    final hasUpdateBadge = context.watch<UpdateModel>().hasSoftBadge;
     return BottomNavigationBar(
       backgroundColor: VscodeTheme.bgSidebar,
       selectedItemColor: VscodeTheme.accent,
@@ -505,7 +508,32 @@ class _EditorScreenState extends State<EditorScreen> {
         BottomNavigationBarItem(icon: const Icon(Icons.search, size: 20), label: lang.tr('nav.search')),
         BottomNavigationBarItem(icon: const Icon(Icons.terminal, size: 20), label: lang.tr('nav.terminal')),
         BottomNavigationBarItem(icon: const Icon(Icons.extension_outlined, size: 20), label: lang.tr('nav.plugins')),
-        BottomNavigationBarItem(icon: const Icon(Icons.settings_outlined, size: 20), label: lang.tr('nav.settings')),
+        BottomNavigationBarItem(
+            icon: _settingsNavIcon(hasUpdateBadge), label: lang.tr('nav.settings')),
+      ],
+    );
+  }
+
+  /// Шестерёнка с красным огоньком, когда доступно обновление.
+  Widget _settingsNavIcon(bool badge) {
+    final icon = const Icon(Icons.settings_outlined, size: 20);
+    if (!badge) return icon;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        icon,
+        Positioned(
+          right: -5,
+          top: -2,
+          child: Container(
+            width: 9,
+            height: 9,
+            decoration: BoxDecoration(
+              color: Colors.red.shade600,
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
       ],
     );
   }

@@ -96,7 +96,22 @@ settings.section.plugins=Plugins
 settings.section.network=Network
 settings.section.storage=Storage
 settings.section.developer=Developer
+settings.section.updates=Software Update
 settings.section.about=About
+
+# Updates (GitHub Releases)
+update.title=A new version is available!
+update.hard_title=Critical security update required
+update.hard_subtitle=Your version {version} is vulnerable. The update is mandatory: the editor stays blocked without it.
+update.update=Update
+update.update_now=UPDATE NOW
+update.later=Later / Close
+update.current=(you have {version})
+update.check_failed=Failed to check for updates. Check your connection.
+update.up_to_date=You are running the latest version of XunCode
+update.error_launch=Could not open the update link
+settings.updates=Software Update
+settings.updates_subtitle=Check for a new version of XunCode
 
 # Settings entries
 settings.theme=Theme

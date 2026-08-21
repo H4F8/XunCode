@@ -10,6 +10,7 @@ class MainActivity : FlutterActivity() {
     private val TERMINAL_CHANNEL = "com.xunkal1.xuncode/terminal"
     private val TERMINAL_EVENTS = "com.xunkal1.xuncode/terminal/events"
     private val STORAGE_CHANNEL = "com.xunkal1.xuncode/storage"
+    private val UPDATE_CHANNEL = "com.xunkal1.xuncode/update"
 
     private lateinit var terminalService: TerminalService
     private val sinks = mutableMapOf<String, EventChannel.EventSink>()
@@ -121,6 +122,42 @@ class MainActivity : FlutterActivity() {
                 }
             }
         )
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, UPDATE_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getInstallSource" -> {
+                    val installer = runCatching {
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                            packageManager.getInstallSourceInfo(packageName).installingPackageName
+                        } else {
+                            @Suppress("DEPRECATION")
+                            packageManager.getInstallerPackageName(packageName)
+                        }
+                    }.getOrNull()
+                    result.success(installer)
+                }
+                "getAppVersion" -> {
+                    val version = runCatching {
+                        packageManager.getPackageInfo(packageName, 0).versionName
+                    }.getOrNull()
+                    if (version != null) result.success(version) else result.error("NO_VERSION", "versionName is null", null)
+                }
+                "openRustoreAppPage" -> {
+                    val uri = android.net.Uri.parse("https://www.rustore.ru/catalog/app/$packageName")
+                    val inStore = android.content.Intent(android.content.Intent.ACTION_VIEW, uri).apply {
+                        setPackage("ru.vk.store")
+                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    val fallback = android.content.Intent(android.content.Intent.ACTION_VIEW, uri).apply {
+                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    var ok = runCatching { startActivity(inStore); true }.getOrDefault(false)
+                    if (!ok) ok = runCatching { startActivity(fallback); true }.getOrDefault(false)
+                    result.success(ok)
+                }
+                else -> result.notImplemented()
+            }
+        }
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, STORAGE_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
