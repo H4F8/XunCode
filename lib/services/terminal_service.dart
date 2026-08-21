@@ -45,6 +45,18 @@ class TerminalBridge {
     final native = await _axsBinaryFromNativeLib();
     if (native != null) return native;
 
+    // В APK бинарники движка кладутся только в jniLibs/arm64-v8a.
+    // Если их нет в nativeLibraryDir — почти наверняка 32-битное
+    // устройство (armeabi-v7a), где терминальный движок недоступен:
+    // честно сообщаем об этом вместо тихого Permission denied.
+    final abi = _abi();
+    if (abi != 'arm64-v8a') {
+      throw UnsupportedError(
+          'Terminal engine binaries are arm64-only, device ABI is $abi');
+    }
+
+    // Фолбэк на asset — работает только там, где exec из data разрешён
+    // (Android < 10). На новых версиях это последний шанс с явной ошибкой.
     final dir = await getApplicationSupportDirectory();
     final axsDir = Directory('${dir.path}/axs');
     final axsFile = File('${axsDir.path}/axs');
@@ -100,10 +112,13 @@ class TerminalBridge {
 
     // Сервер спавнит команду из -c внутри настоящего PTY на каждую сессию.
     // Порт 0 — авто-выбор свободного; реальный порт читаем из stdout.
+    // ВАЖНО: environment в dart:io ПОЛНОСТЬЮ заменяет окружение —
+    // наследуем родительское, иначе дочерние процессы остаются без PATH.
     _axsProcess = await Process.start(axs.path, [
       '-p', '0',
       '-c', _prootCommand(nativeDir, rootfs),
     ], environment: {
+      ...Platform.environment,
       'LD_LIBRARY_PATH': nativeDir,
       'HOME': Directory(rootfs).parent.path,
     });
@@ -527,7 +542,7 @@ class TerminalBridge {
         try {
           final fallback = TerminalSession._('${id}_fallback', cols, rows);
           await fallback._openUnsandboxed();
-          fallback._output.add('[warning] proot/AXS failed: $e\n');
+          fallback._output.add('[warning] engine failed: $e\n');
           fallback._output.add('[warning] using limited Android shell fallback.\n');
           return fallback;
         } catch (_) {}
@@ -701,9 +716,12 @@ class TerminalSession {
   Stream<String> get output => _output.stream;
 
   Future<void> _open() async {
+    _output.add('[terminal] starting engine…\n');
     await TerminalBridge._ensureAxs();
     final port = TerminalBridge._axsPort!;
+    _output.add('[terminal] engine ready on port $port\n');
     _pid = await TerminalBridge._createAxsSession(port, cols, rows);
+    _output.add('[terminal] session pid $_pid, attaching…\n');
     final ws = await _connectWs(port, _pid!);
     final backend = _WebSocketBackend(ws);
     TerminalBridge._sockets[id] = backend;
