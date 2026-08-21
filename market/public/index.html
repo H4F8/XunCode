@@ -596,11 +596,9 @@ footer {
 <section class="section" id="sec-admin">
   <div class="admin-section">
     <h2 style="color:var(--green); font-size:16px; margin-bottom:6px;">Админ-панель</h2>
-    <p style="color:var(--fg-muted); font-size:13px; margin-bottom:16px;">Введите API-ключ для управления плагинами.</p>
-    <div class="form-group">
-      <label>API Key</label>
-      <input id="a-key" type="password" placeholder="ADMIN_API_KEY" />
-    </div>
+    <p style="color:var(--fg-muted); font-size:13px; margin-bottom:16px;">
+      Доступ через вход с GitHub-аккаунта администратора.
+    </p>
     <button class="btn" id="a-load">Загрузить очередь</button>
     <div id="pending-list" style="margin-top:20px;"></div>
   </div>
@@ -956,23 +954,20 @@ function handleAuthFromHash() {
 }
 
 // ── Admin ────────────────────────────────────────────────────────────
-function adminAuthOpts(extraHeaders = {}) {
-  // GitHub-админы идут с подписанной сессией, классический ключ — по-старому.
+function adminAuthOpts() {
+  // Только GitHub-сессия администратора.
   const token = localStorage.getItem('gh_token');
-  const user = getGhUser();
-  if (token && user && user.admin) return { headers: { 'x-gh-token': token, ...extraHeaders } };
-  return { headers: { ...extraHeaders } };
+  return { headers: { 'x-gh-token': token || '' } };
 }
 
 document.getElementById('a-load')?.addEventListener('click', async () => {
-  const key = document.getElementById('a-key').value.trim();
   const user = getGhUser();
-  if (!key && !(user && user.admin)) return toast('Введите API-ключ или войдите как админ', true);
+  if (!(user && user.admin)) return toast('Войдите через GitHub-аккаунт администратора', true);
   const list = document.getElementById('pending-list');
   list.innerHTML = '<div class="empty">Загрузка…</div>';
   try {
-    const r = await fetch('/api/admin/pending', adminAuthOpts(key ? { 'x-admin-key': key } : {}));
-    if (r.status === 401) { list.innerHTML = '<div class="empty">Неверный API-ключ или сессия.</div>'; return; }
+    const r = await fetch('/api/admin/pending', adminAuthOpts());
+    if (r.status === 401) { list.innerHTML = '<div class="empty">Сессия истекла — войдите заново.</div>'; return; }
     if (!r.ok) throw new Error('failed');
     const items = await r.json();
     if (!items.length) { list.innerHTML = '<div class="empty">Нет плагинов на модерации.</div>'; return; }
@@ -985,8 +980,8 @@ document.getElementById('a-load')?.addEventListener('click', async () => {
           <a href="${esc(it.githubUrl || '')}" target="_blank" style="color:var(--accent-light);font-size:12px">${esc(it.githubUrl || '')}</a>
         </div>
         <div class="pending-actions">
-          <button class="btn btn-sm btn-success" onclick="approvePlugin('${esc(it.id)}', '${esc(key)}', this)">✓ Одобрить</button>
-          <button class="btn btn-sm btn-danger" onclick="rejectPlugin('${esc(it.id)}', '${esc(key)}', this)">✕ Отклонить</button>
+          <button class="btn btn-sm btn-success" onclick="approvePlugin('${esc(it.id)}', this)">✓ Одобрить</button>
+          <button class="btn btn-sm btn-danger" onclick="rejectPlugin('${esc(it.id)}', this)">✕ Отклонить</button>
         </div>
       </div>
     `).join('');
@@ -995,17 +990,13 @@ document.getElementById('a-load')?.addEventListener('click', async () => {
   }
 });
 
-async function approvePlugin(id, key, btn) {
+async function approvePlugin(id, btn) {
   btn.disabled = true;
   try {
-    const body = { id };
-    const user = getGhUser();
-    if (key) body.adminKey = key;
-    else if (user && user.admin) body.ghToken = localStorage.getItem('gh_token');
     const r = await fetch('/api/admin/approve', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ id, ghToken: localStorage.getItem('gh_token') }),
     });
     const data = await r.json();
     if (r.ok && data.ok) { toast('✅ Одобрено!'); btn.closest('.pending-item').remove(); }
@@ -1013,17 +1004,13 @@ async function approvePlugin(id, key, btn) {
   } catch (e) { toast('Ошибка сети', true); btn.disabled = false; }
 }
 
-async function rejectPlugin(id, key, btn) {
+async function rejectPlugin(id, btn) {
   btn.disabled = true;
   try {
-    const body = { id };
-    const user = getGhUser();
-    if (key) body.adminKey = key;
-    else if (user && user.admin) body.ghToken = localStorage.getItem('gh_token');
     const r = await fetch('/api/admin/reject', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ id, ghToken: localStorage.getItem('gh_token') }),
     });
     if (r.ok) { toast('Отклонено'); btn.closest('.pending-item').remove(); }
     else { toast('Ошибка', true); btn.disabled = false; }
