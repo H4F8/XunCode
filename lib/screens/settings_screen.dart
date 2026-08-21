@@ -16,6 +16,7 @@ import '../services/plugin_runtime.dart';
 import '../services/plugin_service.dart';
 import '../services/terminal_service.dart';
 import '../services/update_service.dart';
+import '../widgets/report_problem_sheet.dart';
 import '../widgets/update_dialog.dart';
 import 'about_screen.dart';
 import 'github_signin_screen.dart';
@@ -331,6 +332,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildUpdateTile(context, lang),
 
           _section(lang.tr('settings.section.about')),
+          ListTile(
+            tileColor: VscodeTheme.bgSidebar,
+            dense: true,
+            leading: const Icon(Icons.bug_report_outlined,
+                size: 18, color: VscodeTheme.accent),
+            title: Text(lang.tr('feedback.title'),
+                style: const TextStyle(color: VscodeTheme.fg, fontSize: 13)),
+            trailing: const Icon(Icons.chevron_right,
+                size: 16, color: VscodeTheme.fgMuted),
+            onTap: () => showReportProblemSheet(context),
+          ),
           ListTile(
             tileColor: VscodeTheme.bgSidebar,
             dense: true,

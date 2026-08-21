@@ -52,7 +52,7 @@ class LanguageService extends ChangeNotifier {
   final SettingsService _settings;
 
   String _code = 'system';
-  Locale _locale = const Locale('en');
+  Locale _locale = const Locale('ru');
   Map<String, String> _strings = const {};
   Map<String, String> _fallback = const {};
   List<LanguageEntry> _available = const [];
@@ -85,7 +85,7 @@ class LanguageService extends ChangeNotifier {
     final dir = Directory(FileService.languagesDir);
     if (!await dir.exists()) await dir.create(recursive: true);
 
-    const bundleVersion = '4';
+    const bundleVersion = '5';
     final marker = _settings.bundleVersion;
     final allBuiltinPresent = await _bundledLanguagesPresent(dir);
     if (marker == bundleVersion && allBuiltinPresent) return;
@@ -169,7 +169,7 @@ class LanguageService extends ChangeNotifier {
     }
     final sys = ui.PlatformDispatcher.instance.locale.languageCode.toLowerCase();
     if (_available.any((e) => e.code == sys)) return sys;
-    return 'en';
+    return 'ru';
   }
 
   Future<Map<String, String>> _readDictionary(String code) async {

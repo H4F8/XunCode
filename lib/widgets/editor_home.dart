@@ -7,6 +7,7 @@ import '../app/theme.dart';
 import '../services/file_service.dart';
 import '../services/language_service.dart';
 import 'file_tree.dart';
+import 'report_problem_sheet.dart';
 
 /// Стартовый экран редактора: пока не открыт ни один файл,
 /// вместо полотна Monaco показывается меню — недавние файлы и дерево
@@ -168,6 +169,50 @@ class _EditorHomeState extends State<EditorHome> {
                       child: CircularProgressIndicator(strokeWidth: 2)))
               : ListView(
                   children: [
+                    // ── Баннер ранней стадии разработки ──
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: VscodeTheme.bgInput,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Colors.orange.withOpacity(0.55)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(children: [
+                              const Icon(Icons.construction,
+                                  size: 16, color: Colors.orange),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(lang.tr('home.dev_banner_title'),
+                                  style: const TextStyle(
+                                    color: VscodeTheme.fg,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600))),
+                            ]),
+                            const SizedBox(height: 6),
+                            Text(lang.tr('home.dev_banner_text'),
+                              style: const TextStyle(
+                                color: VscodeTheme.fgMuted, fontSize: 12)),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton.icon(
+                                icon: const Icon(Icons.bug_report_outlined,
+                                  size: 14, color: VscodeTheme.accent),
+                                label: Text(lang.tr('feedback.title'),
+                                  style: const TextStyle(fontSize: 12)),
+                                onPressed: () =>
+                                    showReportProblemSheet(context),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                     if (_recent.isNotEmpty) ...[
                       _SectionHeader(
                           title: lang.tr('home.recent'),
