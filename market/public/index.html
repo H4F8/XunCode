@@ -511,8 +511,10 @@ footer {
     <nav>
       <button class="active" data-tab="browse" onclick="showSection('browse')">Каталог</button>
       <button data-tab="submit" onclick="showSection('submit')">Отправить</button>
-      <button data-tab="admin" onclick="showSection('admin')">Админ</button>
+      <button data-tab="ideas" onclick="showSection('ideas')">Идеи</button>
+      <button data-tab="admin" id="nav-admin" onclick="showSection('admin')" style="display:none">Админ</button>
     </nav>
+    <div id="auth-box" style="display:flex;align-items:center;gap:8px;margin-left:8px;"></div>
   </div>
 </header>
 
@@ -547,39 +549,46 @@ footer {
   <div class="form-container">
     <h2 style="color:var(--green); font-size:18px; margin-bottom:6px;">Отправить плагин</h2>
     <p style="color:var(--fg-muted); font-size:13px; margin-bottom:20px;">
-      Репозиторий должен содержать <code style="background:var(--bg3);padding:1px 5px;border-radius:3px;">plugin.json</code> и <code style="background:var(--bg3);padding:1px 5px;border-radius:3px;">main.js</code> в корне.
+      Достаточно названия и ссылки на репозиторий. Репозиторий должен содержать
+      <code style="background:var(--bg3);padding:1px 5px;border-radius:3px;">plugin.json</code> и
+      <code style="background:var(--bg3);padding:1px 5px;border-radius:3px;">main.js</code> в корне —
+      описание, версия и теги подтянутся из <code style="background:var(--bg3);padding:1px 5px;border-radius:3px;">plugin.json</code> автоматически.
     </p>
 
-    <div class="form-group">
-      <label>Plugin ID *</label>
-      <input id="s-id" placeholder="com.author.my-plugin" />
-    </div>
     <div class="form-group">
       <label>Название *</label>
       <input id="s-name" placeholder="My Plugin" />
     </div>
     <div class="form-group">
-      <label>Автор *</label>
-      <input id="s-author" placeholder="@yourhandle" />
-    </div>
-    <div class="form-group">
-      <label>Версия</label>
-      <input id="s-version" placeholder="1.0.0" />
-      <div class="hint">По умолчанию: 1.0.0</div>
-    </div>
-    <div class="form-group">
-      <label>Описание</label>
-      <textarea id="s-desc" rows="3" placeholder="Что делает ваш плагин?"></textarea>
-    </div>
-    <div class="form-group">
       <label>GitHub URL *</label>
       <input id="s-url" placeholder="https://github.com/owner/repo" />
     </div>
-    <div class="form-group">
-      <label>Теги (через запятую)</label>
-      <input id="s-tags" placeholder="productivity, themes, tools" />
-    </div>
     <button class="btn" id="s-submit">Отправить на модерацию</button>
+  </div>
+</section>
+
+<!-- ── Ideas Section ──────────────────────────────────────────────── -->
+<section class="section" id="sec-ideas">
+  <div class="form-container">
+    <h2 style="color:var(--green); font-size:18px; margin-bottom:6px;">💡 Предложить идею</h2>
+    <p style="color:var(--fg-muted); font-size:13px; margin-bottom:20px;">
+      Есть идея для XunCode или плагина? Напишите — разработчик прочитает каждую.
+    </p>
+
+    <div class="form-group">
+      <label>Ник (необязательно)</label>
+      <input id="i-author" maxlength="40" placeholder="@handle" />
+    </div>
+    <div class="form-group">
+      <label>Идея *</label>
+      <textarea id="i-text" rows="4" maxlength="2000" placeholder="Что улучшить, добавить или изменить?"></textarea>
+    </div>
+    <button class="btn" id="i-submit">Отправить идею</button>
+
+    <h2 style="color:var(--green); font-size:14px; margin-top:32px; text-transform:uppercase; letter-spacing:.5px;">
+      Предложенные идеи (<span id="ideas-count">0</span>)
+    </h2>
+    <div id="ideas-list" style="margin-top:10px;"></div>
   </div>
 </section>
 
@@ -621,9 +630,11 @@ let currentDetail = null;
 function showSection(name) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('header nav button').forEach(b => b.classList.remove('active'));
-  document.getElementById('sec-' + name).classList.add('active');
+  const sec = document.getElementById('sec-' + name);
+  if (sec) sec.classList.add('active');
   document.querySelector(`header nav button[data-tab="${name}"]`)?.classList.add('active');
   if (name === 'browse') loadPlugins();
+  if (name === 'ideas') loadIdeas();
   window.scrollTo(0, 0);
 }
 
@@ -809,17 +820,11 @@ async function downloadPlugin(id, url) {
 // ── Submit ───────────────────────────────────────────────────────────
 document.getElementById('s-submit')?.addEventListener('click', async () => {
   const body = {
-    pluginId: document.getElementById('s-id').value.trim(),
     name: document.getElementById('s-name').value.trim(),
-    author: document.getElementById('s-author').value.trim(),
-    version: document.getElementById('s-version').value.trim() || '1.0.0',
-    description: document.getElementById('s-desc').value.trim(),
     githubUrl: document.getElementById('s-url').value.trim(),
-    tags: (document.getElementById('s-tags')?.value || '').split(',').map(t => t.trim()).filter(Boolean),
-    permissions: [],
   };
-  if (!body.pluginId || !body.name || !body.githubUrl) {
-    toast('Заполните обязательные поля (*)', true);
+  if (!body.name || !body.githubUrl) {
+    toast('Заполните название и ссылку на GitHub', true);
     return;
   }
   try {
@@ -831,7 +836,7 @@ document.getElementById('s-submit')?.addEventListener('click', async () => {
     const data = await r.json();
     if (r.ok && data.success) {
       toast('✅ Отправлено на модерацию!');
-      ['s-id','s-name','s-author','s-version','s-desc','s-url','s-tags'].forEach(id => {
+      ['s-name','s-url'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
       });
@@ -843,15 +848,131 @@ document.getElementById('s-submit')?.addEventListener('click', async () => {
   }
 });
 
+// ── Ideas ────────────────────────────────────────────────────────────
+async function loadIdeas() {
+  const list = document.getElementById('ideas-list');
+  const count = document.getElementById('ideas-count');
+  if (!list) return;
+  list.innerHTML = '<div class="empty" style="padding:20px">Загрузка…</div>';
+  try {
+    const r = await fetch('/api/ideas/list');
+    const ideas = await r.json();
+    if (count) count.textContent = Array.isArray(ideas) ? ideas.length : 0;
+    if (!Array.isArray(ideas) || ideas.length === 0) {
+      list.innerHTML = '<div class="empty" style="padding:20px">Идей пока нет — будь первым!</div>';
+      return;
+    }
+    list.innerHTML = ideas.map(i => `
+      <div class="review-item">
+        <div class="review-header">
+          <span class="author">💡 ${esc(i.author || 'Аноним')}</span>
+          <span class="date">${esc((i.date || '').slice(0, 10))}</span>
+        </div>
+        <div class="review-text">${esc(i.text || '')}</div>
+      </div>
+    `).join('');
+  } catch (_) {
+    list.innerHTML = '<div class="empty" style="padding:20px">Не удалось загрузить идеи.</div>';
+  }
+}
+
+document.getElementById('i-submit')?.addEventListener('click', async () => {
+  const user = getGhUser();
+  const body = {
+    author: user ? '@' + user.login : document.getElementById('i-author')?.value?.trim() || '',
+    text: document.getElementById('i-text').value.trim(),
+  };
+  if (!body.text) {
+    toast('Опишите идею', true);
+    return;
+  }
+  try {
+    const r = await fetch('/api/ideas/submit', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await r.json();
+    if (r.ok && data.ok) {
+      toast('✅ Идея отправлена, спасибо!');
+      document.getElementById('i-text').value = '';
+      loadIdeas();
+    } else {
+      toast(data.error || 'Ошибка отправки', true);
+    }
+  } catch (_) {
+    toast('Ошибка сети', true);
+  }
+});
+
+// ── GitHub auth ──────────────────────────────────────────────────────
+function getGhUser() {
+  try { return JSON.parse(localStorage.getItem('gh_user') || 'null'); } catch (_) { return null; }
+}
+
+function updateAuthUi() {
+  const box = document.getElementById('auth-box');
+  const adminBtn = document.getElementById('nav-admin');
+  if (!box) return;
+  const user = getGhUser();
+  if (user && user.login) {
+    box.innerHTML = `
+      <img src="${esc(user.avatar || '')}" alt="" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--border)" />
+      <span style="font-size:12px;color:var(--fg-bright)">${esc(user.login)}</span>
+      <button class="btn btn-outline btn-sm" onclick="ghLogout()">Выйти</button>`;
+  } else {
+    box.innerHTML =
+      `<button class="btn btn-outline btn-sm" onclick="location.href='/api/auth/start'">Войти через GitHub</button>`;
+  }
+  if (adminBtn) adminBtn.style.display = user && user.admin ? '' : 'none';
+}
+
+function ghLogout() {
+  localStorage.removeItem('gh_user');
+  localStorage.removeItem('gh_token');
+  updateAuthUi();
+  toast('Вы вышли из аккаунта');
+}
+
+function handleAuthFromHash() {
+  const m = (location.hash || '').match(/^#auth=(.+)$/);
+  if (m) {
+    try {
+      const [payloadB64] = decodeURIComponent(m[1]).split('.');
+      const payload = JSON.parse(atob(payloadB64.replace(/-/g,'+').replace(/_/g,'/')));
+      if (payload.login) {
+        localStorage.setItem('gh_user', JSON.stringify(payload));
+        localStorage.setItem('gh_token', decodeURIComponent(m[1]));
+        toast('✅ Вы вошли как ' + payload.login);
+      }
+    } catch (_) {}
+    history.replaceState(null, '', location.pathname + location.search);
+  }
+  const err = (location.hash || '').match(/^#authError=(.+)$/);
+  if (err) {
+    toast('Вход не удался: ' + decodeURIComponent(err[1]), true);
+    history.replaceState(null, '', location.pathname + location.search);
+  }
+}
+
 // ── Admin ────────────────────────────────────────────────────────────
+function adminAuthOpts(extraHeaders = {}) {
+  // GitHub-админы идут с подписанной сессией, классический ключ — по-старому.
+  const token = localStorage.getItem('gh_token');
+  const user = getGhUser();
+  if (token && user && user.admin) return { headers: { 'x-gh-token': token, ...extraHeaders } };
+  return { headers: { ...extraHeaders } };
+}
+
 document.getElementById('a-load')?.addEventListener('click', async () => {
   const key = document.getElementById('a-key').value.trim();
-  if (!key) return toast('Введите API-ключ', true);
+  const user = getGhUser();
+  if (!key && !(user && user.admin)) return toast('Введите API-ключ или войдите как админ', true);
   const list = document.getElementById('pending-list');
   list.innerHTML = '<div class="empty">Загрузка…</div>';
   try {
-    const r = await fetch('/api/admin/pending', { headers: { 'x-admin-key': key } });
-    if (r.status === 401) { list.innerHTML = '<div class="empty">Неверный API-ключ.</div>'; return; }
+    const r = await fetch('/api/admin/pending', adminAuthOpts(key ? { 'x-admin-key': key } : {}));
+    if (r.status === 401) { list.innerHTML = '<div class="empty">Неверный API-ключ или сессия.</div>'; return; }
     if (!r.ok) throw new Error('failed');
     const items = await r.json();
     if (!items.length) { list.innerHTML = '<div class="empty">Нет плагинов на модерации.</div>'; return; }
@@ -877,10 +998,14 @@ document.getElementById('a-load')?.addEventListener('click', async () => {
 async function approvePlugin(id, key, btn) {
   btn.disabled = true;
   try {
+    const body = { id };
+    const user = getGhUser();
+    if (key) body.adminKey = key;
+    else if (user && user.admin) body.ghToken = localStorage.getItem('gh_token');
     const r = await fetch('/api/admin/approve', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ id, adminKey: key }),
+      body: JSON.stringify(body),
     });
     const data = await r.json();
     if (r.ok && data.ok) { toast('✅ Одобрено!'); btn.closest('.pending-item').remove(); }
@@ -891,10 +1016,14 @@ async function approvePlugin(id, key, btn) {
 async function rejectPlugin(id, key, btn) {
   btn.disabled = true;
   try {
+    const body = { id };
+    const user = getGhUser();
+    if (key) body.adminKey = key;
+    else if (user && user.admin) body.ghToken = localStorage.getItem('gh_token');
     const r = await fetch('/api/admin/reject', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ id, adminKey: key }),
+      body: JSON.stringify(body),
     });
     if (r.ok) { toast('Отклонено'); btn.closest('.pending-item').remove(); }
     else { toast('Ошибка', true); btn.disabled = false; }
@@ -902,7 +1031,14 @@ async function rejectPlugin(id, key, btn) {
 }
 
 // ── Init ─────────────────────────────────────────────────────────────
-loadPlugins();
+handleAuthFromHash();
+updateAuthUi();
+(() => {
+  const h = (location.hash || '').replace('#', '');
+  const known = ['browse', 'detail', 'submit', 'ideas', 'admin'];
+  if (known.includes(h)) { showSection(h); return; }
+  loadPlugins();
+})();
 </script>
 </body>
 </html>

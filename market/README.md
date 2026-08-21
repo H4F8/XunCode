@@ -34,11 +34,26 @@ durable backend: commit changes back to the repo through the GitHub API.
 
 Set the following env vars on the Vercel project:
 
-| Var               | What                                           |
-|-------------------|------------------------------------------------|
-| `ADMIN_API_KEY`   | Required by `approve.js`                       |
-| `GH_TOKEN`        | (Optional) Personal access token w/ `repo`     |
-| `GH_REPO`         | (Optional) `owner/repo` to commit data back to |
+| Var                   | What                                             |
+|-----------------------|--------------------------------------------------|
+| `ADMIN_API_KEY`       | Required by `approve.js`                         |
+| `GH_TOKEN`            | (Optional) Personal access token w/ `repo`       |
+| `GH_REPO`             | (Optional) `owner/repo` to commit data back to   |
+| `GITHUB_CLIENT_ID`    | OAuth App client id — enables "Sign in with GitHub" |
+| `GITHUB_CLIENT_SECRET`| OAuth App client secret                          |
+| `AUTH_SECRET`         | HMAC secret for session tokens (falls back to `ADMIN_API_KEY`) |
+| `ADMIN_GITHUB_LOGINS` | Comma-separated GitHub logins with admin rights (default `H4F8`) |
+
+### GitHub login setup
+
+1. GitHub → Settings → Developer settings → OAuth Apps → **New OAuth App**.
+2. Homepage URL: `https://vscodemobile-market.vercel.app`
+3. Authorization callback URL: `https://vscodemobile-market.vercel.app/api/auth/callback`
+4. Copy the client id / secret into the Vercel env vars above and redeploy.
+
+After signing in, the header shows your avatar; users whose login is listed in
+`ADMIN_GITHUB_LOGINS` get the **Админ** tab and can approve/reject submissions
+without typing the API key. The classic key flow keeps working.
 
 If `GH_TOKEN` and `GH_REPO` are present, you can extend the write path in
 `review.js` / `submit.js` / `approve.js` to call `PUT /repos/.../contents/...`
@@ -79,11 +94,12 @@ Each entry in `plugins.json` looks like:
 `public/index.html` ships with three tabs:
 
 - **Browse** — public list of approved plugins (rendered with stars).
-- **Submit** — anyone can paste a GitHub URL; the form posts to
-  `/api/admin/submit`, which validates that `plugin.json` and `main.js`
-  exist on the `main` or `master` branch.
-- **Admin** — paste your `ADMIN_API_KEY`, get the list of pending
-  submissions, hit Approve.
+- **Submit** — just the plugin name + GitHub repo URL; the server derives the
+  id, author and metadata from `plugin.json` in the repo, then queues it for
+  moderation.
+- **Ideas** — anyone can leave feature ideas; stored via `/api/ideas/*`.
+- **Admin** — visible to GitHub admins (`ADMIN_GITHUB_LOGINS`) or paste your
+  `ADMIN_API_KEY`, get the list of pending submissions, hit Approve.
 
 ## Links
 

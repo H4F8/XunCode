@@ -7,19 +7,20 @@
 
 const fs = require('fs');
 const path = require('path');
+const { checkAdmin } = require('../_admin.js');
 
-module.exports = (req, res) => {
+module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'method not allowed' });
 
-  const expected = process.env.ADMIN_API_KEY;
-  if (!expected) return res.status(500).json({ error: 'ADMIN_API_KEY not configured' });
-
-  const provided =
-    (req.query && req.query.adminKey) ||
-    req.headers['x-admin-key'] ||
-    '';
-  if (provided !== expected) return res.status(401).json({ error: 'invalid adminKey' });
+  const auth = await checkAdmin(req, null);
+  if (!auth.ok) {
+    // fall back to query param for the classic key flow
+    if (!(req.query && req.query.adminKey && process.env.ADMIN_API_KEY &&
+          req.query.adminKey === process.env.ADMIN_API_KEY)) {
+      return res.status(401).json({ error: auth.error });
+    }
+  }
 
   try {
     const file = path.join(process.cwd(), 'data', 'pending.json');

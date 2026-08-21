@@ -1,11 +1,13 @@
 // POST /api/admin/approve
-//   body: { id, adminKey }
+//   body: { id, adminKey? }  — or GitHub session: { id, ghToken }
 //
 // Moves a submission from data/pending.json to data/plugins.json. Requires
-// the request body's adminKey to match process.env.ADMIN_API_KEY.
+// either ADMIN_API_KEY or a signed GitHub token of an allowlisted admin
+// (see api/_admin.js).
 
 const fs = require('fs');
 const path = require('path');
+const { checkAdmin } = require('../_admin.js');
 
 module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -16,11 +18,11 @@ module.exports = async (req, res) => {
   if (typeof body === 'string') {
     try { body = JSON.parse(body); } catch (_) { body = {}; }
   }
-  const { id, adminKey } = body || {};
 
-  const expected = process.env.ADMIN_API_KEY;
-  if (!expected) return res.status(500).json({ error: 'ADMIN_API_KEY not configured' });
-  if (adminKey !== expected) return res.status(401).json({ error: 'invalid adminKey' });
+  const auth = await checkAdmin(req, body);
+  if (!auth.ok) return res.status(401).json({ error: auth.error });
+
+  const { id } = body || {};
   if (!id) return res.status(400).json({ error: 'id required' });
 
   const cwd = process.cwd();

@@ -1,5 +1,11 @@
 // POST /api/admin/submit
-//   body: { githubUrl, name, description, author, pluginId }
+//   body: { githubUrl, name }
+//
+// Minimal submission: just the plugin name and its GitHub repo link.
+// Everything else is derived automatically:
+//   - pluginId  ← owner.repo (lowercased, sanitized)
+//   - author    ← repo owner
+//   - version / description / tags ← pulled from the repo's plugin.json
 //
 // Validates that the repo has plugin.json and main.js, then appends to
 // data/pending.json. No auth required — moderation happens later via
@@ -17,32 +23,40 @@ module.exports = async (req, res) => {
   if (typeof body === 'string') {
     try { body = JSON.parse(body); } catch (_) { body = {}; }
   }
-  const { githubUrl, name, description, author, pluginId, version, tags, permissions } = body || {};
+  const { githubUrl, name } = body || {};
 
   if (!githubUrl || typeof githubUrl !== 'string') {
     return res.status(400).json({ error: 'githubUrl required' });
   }
-  if (!pluginId || typeof pluginId !== 'string') {
-    return res.status(400).json({ error: 'pluginId required' });
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ error: 'name required' });
   }
 
   const cleaned = cleanUrl(githubUrl);
   const match = /^https:\/\/github\.com\/([^/]+)\/([^/]+)$/.exec(cleaned);
   if (!match) return res.status(400).json({ error: 'githubUrl must be https://github.com/owner/repo' });
-  const [, owner, repo] = match;
+  const [, ownerRaw, repoRaw] = match;
+  const owner = ownerRaw;
+  const repo = repoRaw;
 
-  // Verify plugin.json + main.js exist on either main or master.
+  // Derive a stable plugin id from the repo coordinates.
+  const pluginId = `${owner}.${repo}`.toLowerCase().replace(/[^a-z0-9._-]/g, '-');
+
+  // Fetch plugin.json to auto-fill version/description/tags/author when present.
+  let manifest = null;
   let manifestOk = false;
   let mainOk = false;
   for (const branch of ['main', 'master']) {
     try {
-      const m = await httpHead(`https://raw.githubusercontent.com/${owner}/${repo}/${branch}/plugin.json`);
-      if (m.ok) {
+      const m = await httpGetJson(`https://raw.githubusercontent.com/${owner}/${repo}/${branch}/plugin.json`);
+      if (m.ok && m.json && typeof m.json === 'object') {
         manifestOk = true;
+        manifest = m.json;
         const main = await httpHead(`https://raw.githubusercontent.com/${owner}/${repo}/${branch}/main.js`);
         mainOk = main.ok;
         break;
       }
+      if (m.reachable) { manifestOk = false; break; }
     } catch (_) {}
   }
 
@@ -62,13 +76,20 @@ module.exports = async (req, res) => {
   list = list.filter(it => it.id !== pluginId);
   list.push({
     id: pluginId,
-    name: name || pluginId,
-    version: version || '1.0.0',
-    description: description || '',
-    author: author || owner,
+    name: name.trim(),
+    version: (manifest && manifest.version) || '1.0.0',
+    description:
+      (manifest && (manifest.description || manifest.desc)) ||
+      '',
+    author:
+      (typeof body?.author === 'string' && body.author) ||
+      (manifest && manifest.author) ||
+      owner,
     githubUrl: cleaned,
-    tags: Array.isArray(tags) ? tags : [],
-    permissions: Array.isArray(permissions) ? permissions : [],
+    tags: Array.isArray(manifest?.tags) ? manifest.tags : [],
+    permissions: Array.isArray(manifest?.permissions)
+      ? manifest.permissions
+      : [],
     submittedAt: new Date().toISOString(),
   });
 
@@ -94,6 +115,17 @@ async function httpHead(url) {
   // refuses HEAD on missing files but answers GET cleanly.
   const r = await fetch(url, { method: 'GET', headers: { 'Range': 'bytes=0-0' } });
   return { ok: r.status >= 200 && r.status < 400 };
+}
+
+async function httpGetJson(url) {
+  const r = await fetch(url);
+  if (r.status === 404) return { reachable: false, ok: false, json: null };
+  if (r.status < 200 || r.status >= 400) return { reachable: true, ok: false, json: null };
+  try {
+    return { reachable: true, ok: true, json: JSON.parse(await r.text()) };
+  } catch (_) {
+    return { reachable: true, ok: false, json: null };
+  }
 }
 
 function readBody(req) {
