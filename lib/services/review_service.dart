@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/plugin.dart';
 
 class ReviewService {
-  static const _apiBase = 'https://vscodemobile-market.vercel.app';
+  static const _apiBase = 'https://xuncode-market.vercel.app';
   static const _tokenKey = 'review_user_token';
 
   static Future<String> getUserToken() async {

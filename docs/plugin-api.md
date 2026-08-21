@@ -426,7 +426,7 @@ If your plugin is on GitHub, jsDelivr serves it with CORS automatically:
 
 Once your plugin is hosted and tested:
 
-1. Go to **[vscodemobile-market.vercel.app/submit](https://vscodemobile-market.vercel.app/submit)**
+1. Go to **[xuncode-market.vercel.app/submit](https://xuncode-market.vercel.app/submit)**
 2. Fill in the submission form:
    - Plugin name, description, version
    - Author name / GitHub handle

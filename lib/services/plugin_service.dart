@@ -12,7 +12,7 @@ import 'file_service.dart';
 import 'review_service.dart';
 
 class PluginService {
-  static const _apiBase = 'https://vscodemobile-market.vercel.app';
+  static const _apiBase = 'https://xuncode-market.vercel.app';
   static const _installedKey = 'installed_plugins_v2';
   static const _permsKey = 'plugin_permissions';
 

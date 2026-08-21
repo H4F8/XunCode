@@ -53,8 +53,8 @@ Set the following env vars on the Vercel project:
 ### GitHub login setup
 
 1. GitHub → Settings → Developer settings → OAuth Apps → **New OAuth App**.
-2. Homepage URL: `https://vscodemobile-market.vercel.app`
-3. Authorization callback URL: `https://vscodemobile-market.vercel.app/api/auth/callback`
+2. Homepage URL: `https://xuncode-market.vercel.app`
+3. Authorization callback URL: `https://xuncode-market.vercel.app/api/auth/callback`
 4. Copy the client id / secret into the Vercel env vars above and redeploy.
 
 After signing in, the header shows your avatar; users whose login is listed in

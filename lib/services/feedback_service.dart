@@ -21,7 +21,7 @@ class FeedbackService {
   static const _chatId = 'PUT_CHAT_ID_HERE';
 
   /// Каталог приложений разработчика (самохостинг).
-  static const marketUrl = 'https://vscodemobile-market.vercel.app/';
+  static const marketUrl = 'https://xuncode-market.vercel.app/';
 
   /// Вкладка «Идеи» каталога — туда ведёт кнопка в форме обратной связи.
   static const ideasUrl = '$marketUrl#ideas';
