@@ -4,6 +4,12 @@ Vercel-hosted backend for the in-app marketplace.
 
 ## Endpoints
 
+All `/api/<group>/<name>` URLs are served by a single serverless function
+(`api/gateway.js`) that dispatches to handlers in `api/_h/` — this keeps the
+deployment within the Hobby plan limit of 12 functions (only 1 is used).
+Handlers are not exposed directly; `vercel.json` rewrites map every legacy
+URL to the gateway with `?g=<group>&f=<name>`.
+
 | Method | Path                       | Purpose                                         |
 |--------|----------------------------|-------------------------------------------------|
 | GET    | `/api/plugins/list`        | All approved plugins, sorted by rating          |

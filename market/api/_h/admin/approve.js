@@ -7,7 +7,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { checkAdmin } = require('../_admin.js');
+const { checkAdmin } = require('../../_admin.js');
 
 module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(204).end();

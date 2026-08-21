@@ -9,7 +9,7 @@
 // trust the identity can verify via POST /api/auth/me.
 
 const crypto = require('crypto');
-const { adminLogins } = require('../_admin.js');
+const { adminLogins } = require('../../_admin.js');
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
