@@ -1,17 +1,14 @@
 // GET /api/plugins/list?q=search — returns approved plugins, sorted by rating desc.
 // Optional ?q= filter searches name, author, description, tags.
 
-const fs = require('fs');
-const path = require('path');
+const store = require('../../_store.js');
 
-module.exports = (req, res) => {
+module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'method not allowed' });
 
   try {
-    const file = path.join(process.cwd(), 'data', 'plugins.json');
-    const raw = fs.existsSync(file) ? fs.readFileSync(file, 'utf-8') : '[]';
-    let list = JSON.parse(raw);
+    let list = await store.readJson('plugins.json', []);
     if (!Array.isArray(list)) return res.status(500).json({ error: 'corrupt data' });
 
     // search filter

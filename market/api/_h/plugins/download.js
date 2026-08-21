@@ -5,25 +5,8 @@
 // per (pluginId, userToken) — the same anonymous user can install/uninstall
 // the same plugin without inflating the counter.
 //
-// Same FS caveat as review.js: writes succeed on `vercel dev` and on
-// deployments where data/ is writable; otherwise you need a GH-token-backed
-// commit path. See market/README.md.
-
-const fs = require('fs');
-const path = require('path');
-
-function readJson(file, fallback) {
-  try {
-    return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf-8')) : fallback;
-  } catch (_) {
-    return fallback;
-  }
-}
-
-function writeJson(file, data) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf-8');
-}
+// Persistence goes through api/_store.js (Upstash Redis in production).
+const store = require('../../_store.js');
 
 module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -44,16 +27,14 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: 'userToken required' });
   }
 
-  const cwd = process.cwd();
-  const pluginsFile = path.join(cwd, 'data', 'plugins.json');
-  const dlFile = path.join(cwd, 'data', 'downloads', `${pluginId}.json`);
+  const dlRel = `downloads/${pluginId}.json`;
 
-  const tokens = new Set(readJson(dlFile, []));
+  const tokens = new Set(await store.readJson(dlRel, []));
   const fresh = !tokens.has(userToken);
   if (fresh) {
     tokens.add(userToken);
     try {
-      writeJson(dlFile, Array.from(tokens));
+      await store.writeJson(dlRel, Array.from(tokens));
     } catch (e) {
       return res.status(500).json({ error: 'persist failed: ' + (e.message || e) });
     }
@@ -61,12 +42,12 @@ module.exports = async (req, res) => {
 
   let total = 0;
   try {
-    const plugins = readJson(pluginsFile, []);
+    const plugins = await store.readJson('plugins.json', []);
     const idx = plugins.findIndex(p => p && p.id === pluginId);
     if (idx >= 0) {
       if (fresh) {
         plugins[idx].downloads = (plugins[idx].downloads || 0) + 1;
-        writeJson(pluginsFile, plugins);
+        await store.writeJson('plugins.json', plugins);
       }
       total = plugins[idx].downloads || 0;
     }

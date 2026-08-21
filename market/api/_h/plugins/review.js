@@ -8,36 +8,17 @@
 //   volume. For production deployments, configure a GitHub-token-backed write
 //   path (see market/README.md).
 
-const fs = require('fs');
-const path = require('path');
+const store = require('../../_store.js');
 
 const MAX_REVIEW_LEN = 2000;
-
-function readJson(file, fallback) {
-  try {
-    return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf-8')) : fallback;
-  } catch (_) {
-    return fallback;
-  }
-}
-
-function writeJson(file, data) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf-8');
-}
 
 module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(204).end();
 
-  const cwd = process.cwd();
-  const reviewsDir = path.join(cwd, 'data', 'reviews');
-  const pluginsFile = path.join(cwd, 'data', 'plugins.json');
-
   if (req.method === 'GET') {
     const id = (req.query && req.query.id) || '';
     if (!id) return res.status(400).json({ error: 'missing id' });
-    const file = path.join(reviewsDir, `${id}.json`);
-    const list = readJson(file, []);
+    const list = await store.readJson(`reviews/${id}.json`, []);
     res.status(200).json(list);
     return;
   }
@@ -63,8 +44,8 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: 'userToken required' });
     }
 
-    const file = path.join(reviewsDir, `${pluginId}.json`);
-    const list = readJson(file, []);
+    const rel = `reviews/${pluginId}.json`;
+    const list = await store.readJson(rel, []);
 
     const existing = list.findIndex(it => it.userToken === userToken);
     const entry = {
@@ -80,20 +61,20 @@ module.exports = async (req, res) => {
     else list.push(entry);
 
     try {
-      writeJson(file, list);
+      await store.writeJson(rel, list);
     } catch (e) {
       return res.status(500).json({ error: 'persist failed: ' + (e.message || e) });
     }
 
     // Recompute rating in plugins.json
     try {
-      const plugins = readJson(pluginsFile, []);
+      const plugins = await store.readJson('plugins.json', []);
       const idx = plugins.findIndex(p => p && p.id === pluginId);
       if (idx >= 0) {
         const sum = list.reduce((acc, it) => acc + (Number(it.rating) || 0), 0);
         plugins[idx].rating = list.length ? +(sum / list.length).toFixed(2) : 0;
         plugins[idx].reviewsCount = list.length;
-        writeJson(pluginsFile, plugins);
+        await store.writeJson('plugins.json', plugins);
       }
     } catch (_) {}
 

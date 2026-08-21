@@ -1,9 +1,8 @@
 // GET /api/plugins/info?id=<id> — returns details of a single plugin.
 
-const fs = require('fs');
-const path = require('path');
+const store = require('../../_store.js');
 
-module.exports = (req, res) => {
+module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'method not allowed' });
 
@@ -11,9 +10,7 @@ module.exports = (req, res) => {
   if (!id) return res.status(400).json({ error: 'missing id' });
 
   try {
-    const file = path.join(process.cwd(), 'data', 'plugins.json');
-    const raw = fs.existsSync(file) ? fs.readFileSync(file, 'utf-8') : '[]';
-    const list = JSON.parse(raw);
+    const list = await store.readJson('plugins.json', []);
     const found = list.find(p => p && p.id === id);
     if (!found) return res.status(404).json({ error: 'not found' });
     res.status(200).json(found);

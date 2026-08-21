@@ -5,8 +5,7 @@
 // either ADMIN_API_KEY or a signed GitHub token of an allowlisted admin
 // (see api/_admin.js).
 
-const fs = require('fs');
-const path = require('path');
+const store = require('../../_store.js');
 const { checkAdmin } = require('../../_admin.js');
 
 module.exports = async (req, res) => {
@@ -25,15 +24,11 @@ module.exports = async (req, res) => {
   const { id } = body || {};
   if (!id) return res.status(400).json({ error: 'id required' });
 
-  const cwd = process.cwd();
-  const pendingFile = path.join(cwd, 'data', 'pending.json');
-  const pluginsFile = path.join(cwd, 'data', 'plugins.json');
-
-  let pending = [];
-  let plugins = [];
+  let pending;
+  let plugins;
   try {
-    pending = fs.existsSync(pendingFile) ? JSON.parse(fs.readFileSync(pendingFile, 'utf-8')) : [];
-    plugins = fs.existsSync(pluginsFile) ? JSON.parse(fs.readFileSync(pluginsFile, 'utf-8')) : [];
+    pending = await store.readJson('pending.json', []);
+    plugins = await store.readJson('plugins.json', []);
   } catch (e) {
     return res.status(500).json({ error: 'failed to read data: ' + (e.message || e) });
   }
@@ -55,8 +50,8 @@ module.exports = async (req, res) => {
   });
 
   try {
-    fs.writeFileSync(pendingFile, JSON.stringify(pending, null, 2));
-    fs.writeFileSync(pluginsFile, JSON.stringify(filtered, null, 2));
+    await store.writeJson('pending.json', pending);
+    await store.writeJson('plugins.json', filtered);
   } catch (e) {
     return res.status(500).json({ error: 'persist failed: ' + (e.message || e) });
   }

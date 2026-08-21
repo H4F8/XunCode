@@ -5,8 +5,7 @@
 // only serves files under /public, so the admin UI cannot read data/pending.json
 // directly.
 
-const fs = require('fs');
-const path = require('path');
+const store = require('../../_store.js');
 const { checkAdmin } = require('../../_admin.js');
 
 module.exports = async (req, res) => {
@@ -23,9 +22,7 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const file = path.join(process.cwd(), 'data', 'pending.json');
-    const raw = fs.existsSync(file) ? fs.readFileSync(file, 'utf-8') : '[]';
-    const list = JSON.parse(raw);
+    const list = await store.readJson('pending.json', []);
     res.status(200).json(Array.isArray(list) ? list : []);
   } catch (e) {
     res.status(500).json({ error: String(e && e.message || e) });

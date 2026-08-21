@@ -11,8 +11,7 @@
 // data/pending.json. No auth required — moderation happens later via
 // /api/admin/approve.
 
-const fs = require('fs');
-const path = require('path');
+const store = require('../../_store.js');
 
 module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -67,13 +66,8 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: 'main.js not reachable' });
   }
 
-  const pendingFile = path.join(process.cwd(), 'data', 'pending.json');
-  let list = [];
-  try {
-    list = fs.existsSync(pendingFile) ? JSON.parse(fs.readFileSync(pendingFile, 'utf-8')) : [];
-  } catch (_) { list = []; }
-
-  list = list.filter(it => it.id !== pluginId);
+  const list = (await store.readJson('pending.json', []))
+    .filter(it => it.id !== pluginId);
   list.push({
     id: pluginId,
     name: name.trim(),
@@ -94,8 +88,7 @@ module.exports = async (req, res) => {
   });
 
   try {
-    fs.mkdirSync(path.dirname(pendingFile), { recursive: true });
-    fs.writeFileSync(pendingFile, JSON.stringify(list, null, 2));
+    await store.writeJson('pending.json', list);
   } catch (e) {
     return res.status(500).json({ error: 'persist failed: ' + (e.message || e) });
   }

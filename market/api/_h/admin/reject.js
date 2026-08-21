@@ -3,8 +3,7 @@
 //
 // Removes a submission from data/pending.json. Requires adminKey.
 
-const fs = require('fs');
-const path = require('path');
+const store = require('../../_store.js');
 const { checkAdmin } = require('../../_admin.js');
 
 module.exports = async (req, res) => {
@@ -22,12 +21,9 @@ module.exports = async (req, res) => {
   if (!auth.ok) return res.status(401).json({ error: auth.error });
   if (!id) return res.status(400).json({ error: 'id required' });
 
-  const cwd = process.cwd();
-  const pendingFile = path.join(cwd, 'data', 'pending.json');
-
-  let pending = [];
+  let pending;
   try {
-    pending = fs.existsSync(pendingFile) ? JSON.parse(fs.readFileSync(pendingFile, 'utf-8')) : [];
+    pending = await store.readJson('pending.json', []);
   } catch (e) {
     return res.status(500).json({ error: 'failed to read data: ' + (e.message || e) });
   }
@@ -38,7 +34,7 @@ module.exports = async (req, res) => {
   pending.splice(idx, 1);
 
   try {
-    fs.writeFileSync(pendingFile, JSON.stringify(pending, null, 2));
+    await store.writeJson('pending.json', pending);
   } catch (e) {
     return res.status(500).json({ error: 'persist failed: ' + (e.message || e) });
   }

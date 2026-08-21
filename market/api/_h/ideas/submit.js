@@ -2,37 +2,20 @@
 //   GET  → returns all ideas (newest first)
 //   POST { author?, text } → adds an idea
 //
-// Storage notes (same as plugins/review): on Vercel the function FS is
-// read-only on the hot path; writes persist on local `vercel dev` or when
-// data/ is mounted as a writable volume / replaced by a token-backed writer.
+// Storage via api/_store.js — GitHub Contents API in production, fs locally.
 
-const fs = require('fs');
-const path = require('path');
+const store = require('../../_store.js');
 
 const MAX_IDEA_LEN = 2000;
 const MAX_AUTHOR_LEN = 40;
 
-function readJson(file, fallback) {
-  try {
-    return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf-8')) : fallback;
-  } catch (_) {
-    return fallback;
-  }
-}
-
-function writeJson(file, data) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf-8');
-}
-
 module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(204).end();
 
-  const cwd = process.cwd();
-  const ideasFile = path.join(cwd, 'data', 'ideas.json');
+  const rel = 'ideas.json';
 
   if (req.method === 'GET') {
-    const list = readJson(ideasFile, []);
+    const list = await store.readJson(rel, []);
     const sorted = (Array.isArray(list) ? list : [])
       .slice()
       .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
@@ -56,7 +39,7 @@ module.exports = async (req, res) => {
         ? author.trim().slice(0, MAX_AUTHOR_LEN)
         : 'Anonymous';
 
-    const list = readJson(ideasFile, []);
+    let list = await store.readJson(rel, []);
     if (!Array.isArray(list)) {
       return res.status(500).json({ error: 'ideas storage corrupted' });
     }
@@ -68,7 +51,7 @@ module.exports = async (req, res) => {
     });
 
     try {
-      writeJson(ideasFile, list);
+      await store.writeJson(rel, list);
     } catch (e) {
       return res.status(500).json({ error: 'persist failed: ' + (e.message || e) });
     }
