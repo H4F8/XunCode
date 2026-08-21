@@ -324,7 +324,7 @@ void _writeArchiveSync(Archive archive, String outDir) {
       final f = File(outPath);
       f.parent.createSync(recursive: true);
       f.writeAsBytesSync(entry.content as List<int>, flush: false);
-      if ((entry.mode & 0o100) != 0) executables.add(outPath);
+      if ((entry.mode & 0x40) != 0) executables.add(outPath); // 0o100: owner-x
     } else {
       Directory(outPath).createSync(recursive: true);
     }
