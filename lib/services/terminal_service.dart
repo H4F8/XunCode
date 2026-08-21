@@ -72,71 +72,135 @@ class TerminalBridge {
     return null;
   }
 
+  /// Полная команда для старта Alpine внутри proot. Сервер исполнения
+  /// сплитит её по пробелам: первый токен — программа, остальное — аргументы.
+  static String _prootCommand(String nativeDir, String rootfs) {
+    final proot = '$nativeDir/libproot.so';
+    return [
+      proot,
+      '-r', rootfs,
+      '-w', '/home/user',
+      '-b', '/dev',
+      '-b', '/proc',
+      '-b', '/sys',
+      '-b', '/dev/urandom:/dev/random',
+      '-b', '/proc/self/fd:/dev/fd',
+      '-b', '/sdcard',
+      '/bin/sh', '-l',
+    ].join(' ');
+  }
+
   static Future<void> _ensureAxs() async {
     if (_axsProcess != null) return;
     if (_isDesktop) return; // no AXS on desktop
     final axs = await _axsBinary();
-    final rootfs = await rootfsPath();
     final nativeDir =
-        await _method.invokeMethod<String>('getNativeLibraryDir') ??
-            '/data/app/com.xunkal1.xuncode/lib/arm64';
-    final prootBin = '$nativeDir/libproot.so';
+        await _method.invokeMethod<String>('getNativeLibraryDir') ?? '';
+    final rootfs = await rootfsPath();
 
-    // AXS не всегда стартует стабильно на Android 8/10/12: иногда бинарник
-    // падает сразу, иногда не пишет порт. Если порт не получен — бросаем
-    // ошибку, и вызывающий код должен упасть обратно на системный shell.
+    // Сервер спавнит команду из -c внутри настоящего PTY на каждую сессию.
+    // Порт 0 — авто-выбор свободного; реальный порт читаем из stdout.
     _axsProcess = await Process.start(axs.path, [
       '-p', '0',
-      '-c', '/bin/sh',
+      '-c', _prootCommand(nativeDir, rootfs),
     ], environment: {
-      'PROOT_PATH': prootBin,
-      'ROOTFS': rootfs,
       'LD_LIBRARY_PATH': nativeDir,
+      'HOME': Directory(rootfs).parent.path,
     });
 
-    final portFuture = _axsProcess!.stdout
-        .transform(utf8.decoder)
-        .transform(const LineSplitter())
-        .firstWhere(
-          (line) => RegExp(r'started on .*:(\d+)').hasMatch(line),
-          orElse: () => '',
-        )
-        .then((line) {
-      final match = RegExp(r'started on .*:(\d+)').firstMatch(line);
-      if (match != null) {
-        _axsPort = int.parse(match.group(1)!);
-      }
-      return _axsPort;
-    });
+    // Сервер логирует «listening on 127.0.0.1:PORT» (ранние сборки писали
+    // «started on http://…»). ANSI-коды срезаем на всякий случай.
+    final portRe = RegExp(
+      r'(?:listening\s+on|started\s+on)\s+(?:http://)?[\w.\-]+:(\d+)',
+    );
+    final stdoutDone = Completer<int?>();
+    final stderrFirst = Completer<String>();
+    late StreamSubscription subOut;
+    late StreamSubscription subErr;
 
-    final stderrFuture = _axsProcess!.stderr
-        .transform(utf8.decoder)
-        .transform(const LineSplitter())
-        .first
-        .then((line) => line)
-        .catchError((_) => '');
-
-    try {
-      final result = await Future.any([
-        Future.wait([portFuture, stderrFuture]),
-        Future.delayed(
-            _axsTimeout, () => throw TimeoutException('AXS start timeout')),
-      ]);
-      final resultList = result as List<dynamic>;
-      final port = resultList[0] as int?;
-      final err = resultList[1] as String?;
-      if (port == null || port <= 0) {
-        _axsProcess?.kill();
-        _axsProcess = null;
-        _axsPort = null;
-        throw Exception('AXS did not report a port${err?.isNotEmpty == true ? ": $err" : ""}');
-      }
-    } catch (_) {
-      _axsProcess?.kill();
-      _axsProcess = null;
-      _axsPort = null;
-      rethrow;
+    void failStart(Object e) {
+      if (!stdoutDone.isCompleted) stdoutDone.completeError(e);
     }
+
+    subOut = _axsProcess!.stdout
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())
+        .listen(
+      (raw) {
+        final line = raw.replaceAll(RegExp(r'\x1B\[[0-9;]*[A-Za-z]'), '');
+        final m = portRe.firstMatch(line);
+        if (m != null && !stdoutDone.isCompleted) {
+          stdoutDone.complete(int.tryParse(m.group(1)!));
+          subOut.cancel();
+        }
+      },
+      onError: failStart,
+      onDone: () {
+        if (!stdoutDone.isCompleted) stdoutDone.complete(null);
+      },
+    );
+
+    subErr = _axsProcess!.stderr
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())
+        .listen(
+      (line) {
+        if (!stderrFirst.isCompleted && line.trim().isNotEmpty) {
+          stderrFirst.complete(line);
+        }
+      },
+      onError: (Object e) {
+        if (!stderrFirst.isCompleted) stderrFirst.complete('');
+      },
+      onDone: () {
+        if (!stderrFirst.isCompleted) stderrFirst.complete('');
+      },
+    );
+
+    int? port;
+    try {
+      port = await Future.any([
+        stdoutDone.future,
+        Future.delayed(_axsTimeout, () => throw TimeoutException('AXS start timeout')),
+      ]);
+    } catch (e) {
+      subOut.cancel();
+      subErr.cancel();
+      _killAxs();
+      throw Exception('AXS failed to start: $e');
+    }
+
+    if (port == null || port <= 0) {
+      final err =
+          stderrFirst.isCompleted ? await stderrFirst.future : '';
+      subOut.cancel();
+      subErr.cancel();
+      _killAxs();
+      throw Exception(
+          'AXS did not report a port${err.isNotEmpty ? ": $err" : ""}');
+    }
+    _axsPort = port;
+  }
+
+  static void _killAxs() {
+    _axsProcess?.kill();
+    _axsProcess = null;
+    _axsPort = null;
+  }
+
+  /// Создаёт PTY-сессию на сервере: POST /terminals → текстовый pid.
+  static Future<String> _createAxsSession(int port, int cols, int rows) async {
+    final res = await http.post(
+      Uri.parse('http://127.0.0.1:$port/terminals'),
+      body: jsonEncode({'cols': cols.toString(), 'rows': rows.toString()}),
+      headers: {'Content-Type': 'application/json'},
+    ).timeout(const Duration(seconds: 10));
+    if (res.statusCode != 200) {
+      throw Exception('Failed to create terminal session (${res.statusCode})');
+    }
+    final pid = res.body.trim().replaceAll('"', '');
+    if (pid.isEmpty) throw Exception('Server returned empty session id');
+    return pid;
   }
 
   /// Путь к rootfs Alpine
@@ -163,36 +227,22 @@ class TerminalBridge {
     if (prefs.getBool('alpine.installed') == true) {
       try {
         final root = await rootfsPath();
-        if (root.isNotEmpty) {
+        if (root.isNotEmpty && await _rootfsHealthy(root)) {
           final marker = File('$root/.installed');
-          if (await marker.exists()) {
-            // Проверим, что /bin/sh реально существует — иногда маркер есть,
-            // а rootfs побит.
-            final binSh = File('$root/bin/sh');
-            if (await binSh.exists()) return true;
-          }
-          final dir = Directory(root);
-          if (await dir.exists() && await _hasContent(dir)) {
+          if (!await marker.exists()) {
             await marker.writeAsString('ok');
-            return true;
           }
+          return true;
         }
       } catch (_) {}
+      // Маркер есть, но rootfs бит (наследие старого распаковщика) —
+      // сбрасываем и переустанавливаем при следующем запуске.
       await prefs.setBool('alpine.installed', false);
     }
     final v = await _method.invokeMethod<bool>('isAlpineInstalled');
     final installed = v ?? false;
     if (installed) await prefs.setBool('alpine.installed', true);
     return installed;
-  }
-
-  static Future<bool> _hasContent(Directory dir) async {
-    try {
-      await for (final _ in dir.list(followLinks: false)) {
-        return true;
-      }
-    } catch (_) {}
-    return false;
   }
 
   static Future<void> clearAlpineCache() async {
@@ -230,24 +280,98 @@ class TerminalBridge {
   }
 
   /// Распаковывает встроенный в assets rootfs в рабочую директорию приложения.
+  /// Проверка здоровья rootfs: busybox существует как файл, /bin/sh
+  /// существует и НЕ является директорией. Старые версии распаковщика
+  /// превращали симлинк /bin/sh → /bin/busybox в пустую папку, из-за
+  /// чего proot мгновенно падал.
+  static Future<bool> _rootfsHealthy(String root) async {
+    if (!await File('$root/bin/busybox').exists()) return false;
+    if (await Directory('$root/bin/sh').exists()) return false;
+    return await File('$root/bin/sh').exists();
+  }
+
+  static Future<void> _wipeRootfs(String root) async {
+    final d = Directory(root);
+    if (await d.exists()) {
+      try {
+        await d.delete(recursive: true);
+      } catch (_) {}
+    }
+    await d.create(recursive: true);
+  }
+
+  /// Распаковка системным tar — сохраняет симлинки и права «как есть».
+  static Future<bool> _trySystemTarRootfs(String gzPath, String dest) async {
+    for (final flags in const ['-xzf', '-xf']) {
+      try {
+        final r = await Process.run('tar', [flags, gzPath, '-C', dest]);
+        if (r.exitCode == 0) return true;
+      } catch (_) {}
+    }
+    return false;
+  }
+
+  /// Чисто-Dart фолбэк: настоящие симлинки (dart:io Link работает на
+  /// Android), batched chmod для исполнимых файлов. Архитектурно повторяет
+  /// экстрактор языковых пакетов.
+  static Future<void> _extractTarEntries(
+    String tarPath,
+    String root,
+    void Function(double progress, String stage)? onProgress,
+  ) async {
+    final stream = InputFileStream(tarPath);
+    final execPaths = <String>[];
+    try {
+      final archive = TarDecoder().decodeBuffer(stream);
+      final total = archive.length.clamp(1, 1 << 30);
+      var done = 0;
+      for (final entry in archive) {
+        final outPath = '$root/${entry.name}';
+        if (entry.isFile) {
+          final f = File(outPath);
+          await f.parent.create(recursive: true);
+          await f.writeAsBytes(entry.content as List<int>, flush: false);
+          // 0x40 = owner-exec в правах tar.
+          if ((entry.mode & 0x40) != 0) execPaths.add(outPath);
+        } else if (entry.isSymbolicLink) {
+          try {
+            await Link(outPath).create(entry.nameOfLinkedFile);
+          } catch (_) {}
+        } else {
+          await Directory(outPath).create(recursive: true);
+        }
+        done++;
+        if (done % 200 == 0) onProgress?.call(done / total, 'Extracting Alpine');
+      }
+    } finally {
+      await stream.close();
+    }
+    // dart:io не умеет chmod — пакетные вызовы системного chmod
+    // (по 400 путей за вызов, чтобы не превысить ARG_MAX).
+    for (var i = 0; i < execPaths.length; i += 400) {
+      final end = (i + 400).clamp(0, execPaths.length);
+      try {
+        await Process.run('chmod', ['755', ...execPaths.sublist(i, end)]);
+      } catch (_) {}
+    }
+  }
+
   static Future<void> extractEmbeddedRootfs(
     void Function(double progress, String stage)? onProgress,
   ) async {
     if (_isDesktop) return;
     final root = await rootfsPath();
-    final rootDir = Directory(root);
-    if (!await rootDir.exists()) await rootDir.create(recursive: true);
 
-    // Если уже есть /bin/sh — не распаковываем повторно.
-    if (await File('$root/bin/sh').exists()) {
+    // Здоровый rootfs не трогаем; битый/недораспакованный от прошлых
+    // версий — сносим и ставим заново (самозалечка при обновлении).
+    if (await _rootfsHealthy(root)) {
       await markAlpineInstalled();
       return;
     }
 
-    onProgress?.call(0.0, 'Extracting Alpine');
+    onProgress?.call(0.05, 'Extracting Alpine');
+    await _wipeRootfs(root);
 
-    // AssetManifest не всегда содержит каждый файл отдельно, поэтому
-    // используем бинарный tar.gz, встроенный как единый asset.
     final bytes = await rootBundle.load('$_kEmbeddedRootfsAsset/rootfs.tar.gz');
     final tmpRoot = Directory(FileService.tmpDir);
     if (!await tmpRoot.exists()) await tmpRoot.create(recursive: true);
@@ -264,32 +388,19 @@ class TerminalBridge {
       await output.close();
     }
 
-    final tarStream = InputFileStream(tarPath);
-    try {
-      final archive = TarDecoder().decodeBuffer(tarStream);
-      final total = archive.length;
-      var done = 0;
-      for (final entry in archive) {
-        final outPath = '$root/${entry.name}';
-        if (entry.isFile) {
-          final f = File(outPath);
-          await f.parent.create(recursive: true);
-          await f.writeAsBytes(entry.content as List<int>, flush: false);
-        } else {
-          await Directory(outPath).create(recursive: true);
-        }
-        done++;
-        if (done % 200 == 0) {
-          onProgress?.call(done / total, 'Extracting Alpine');
-        }
-      }
-      onProgress?.call(1.0, 'Extracting Alpine');
-    } finally {
-      await tarStream.close();
+    onProgress?.call(0.15, 'Extracting Alpine');
+    if (!await _trySystemTarRootfs(gzPath, root)) {
+      await _extractTarEntries(tarPath, root, onProgress);
     }
 
     await _silent(() => File(gzPath).delete());
     await _silent(() => File(tarPath).delete());
+
+    if (!await _rootfsHealthy(root)) {
+      throw StateError(
+          'Rootfs extraction failed verification (/bin/sh or /bin/busybox missing)');
+    }
+    onProgress?.call(1.0, 'Extracting Alpine');
     await markAlpineInstalled();
   }
 
@@ -373,35 +484,9 @@ class TerminalBridge {
         await output.close();
       }
 
-      onProgress?.call(0.0, 'Extracting');
-      final tarStream = InputFileStream(tarPath);
-      try {
-        final archive = TarDecoder().decodeBuffer(tarStream);
-        final total = archive.length;
-        var done = 0;
-        for (final entry in archive) {
-          if (cancelToken?.isCancelled ?? false) {
-            throw DioException.requestCancelled(
-              requestOptions: RequestOptions(path: url),
-              reason: 'cancelled during extraction',
-            );
-          }
-          final outPath = '$root/${entry.name}';
-          if (entry.isFile) {
-            final f = File(outPath);
-            await f.parent.create(recursive: true);
-            await f.writeAsBytes(entry.content as List<int>, flush: false);
-          } else {
-            await Directory(outPath).create(recursive: true);
-          }
-          done++;
-          if (done % 200 == 0) {
-            onProgress?.call(done / total, 'Extracting');
-          }
-        }
-        onProgress?.call(1.0, 'Extracting');
-      } finally {
-        await tarStream.close();
+      onProgress?.call(0.15, 'Extracting');
+      if (!await _trySystemTarRootfs(gzPath, root)) {
+        await _extractTarEntries(tarPath, root, onProgress);
       }
 
       final resolv = File('$root/etc/resolv.conf');
@@ -410,6 +495,9 @@ class TerminalBridge {
 
       await _silent(() => File(gzPath).delete());
       await _silent(() => File(tarPath).delete());
+      if (!await _rootfsHealthy(root)) {
+        throw StateError('Rootfs extraction failed verification');
+      }
       await prefs.setBool('rootfs_downloading', false);
       await markAlpineInstalled();
     } catch (e) {
@@ -526,7 +614,12 @@ class _WebSocketBackend implements _BackendSession {
   _WebSocketBackend(this.ws) {
     ws.listen(
       (data) {
-        if (data is String) _ctrl.add(data);
+        // PTY шлёт бинарные кадры; текстовые тоже принимаем.
+        if (data is String) {
+          _ctrl.add(data);
+        } else if (data is List<int>) {
+          _ctrl.add(utf8.decode(data, allowMalformed: true));
+        }
       },
       onError: (e) => _ctrl.add('\n[stream error] $e\n'),
       onDone: () {
@@ -599,6 +692,7 @@ class TerminalSession {
   final String id;
   int cols;
   int rows;
+  String? _pid; // pid PTY-сессии на стороне сервера
   StreamSubscription? _sub;
   final _output = StreamController<String>.broadcast();
 
@@ -608,8 +702,9 @@ class TerminalSession {
 
   Future<void> _open() async {
     await TerminalBridge._ensureAxs();
-    final port = TerminalBridge._axsPort ?? 8767;
-    final ws = await _connectWs(port);
+    final port = TerminalBridge._axsPort!;
+    _pid = await TerminalBridge._createAxsSession(port, cols, rows);
+    final ws = await _connectWs(port, _pid!);
     final backend = _WebSocketBackend(ws);
     TerminalBridge._sockets[id] = backend;
     _sub = backend.output.listen((chunk) => _output.add(chunk));
@@ -665,13 +760,13 @@ class TerminalSession {
     }
   }
 
-  Future<WebSocket> _connectWs(int port) async {
+  Future<WebSocket> _connectWs(int port, String pid) async {
     const maxAttempts = 5;
     Exception? lastError;
     for (var attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         return await WebSocket.connect(
-          'ws://127.0.0.1:$port/terminals/new',
+          'ws://127.0.0.1:$port/terminals/$pid',
         ).timeout(const Duration(seconds: 5));
       } on Exception catch (e) {
         lastError = e;
@@ -698,17 +793,35 @@ class TerminalSession {
       return;
     }
     await TerminalBridge._ensureAxs();
-    final port = TerminalBridge._axsPort ?? 8767;
-    await http.post(
-      Uri.parse('http://127.0.0.1:$port/terminals/$id/resize'),
-      body: jsonEncode({'cols': c, 'rows': r}),
-      headers: {'Content-Type': 'application/json'},
-    );
+    final port = TerminalBridge._axsPort;
+    if (port == null || _pid == null) return;
+    try {
+      await http
+          .post(
+            Uri.parse('http://127.0.0.1:$port/terminals/$_pid/resize'),
+            body: jsonEncode({'cols': c.toString(), 'rows': r.toString()}),
+            headers: {'Content-Type': 'application/json'},
+          )
+          .timeout(const Duration(seconds: 5));
+    } catch (_) {}
   }
 
   Future<void> kill() async {
     runCatching(() => _sub?.cancel());
     _sub = null;
+    // Завершаем PTY-сессию на стороне сервера.
+    if (!kIsWeb &&
+        (Platform.isAndroid)) {
+      final port = TerminalBridge._axsPort;
+      if (port != null && _pid != null) {
+        try {
+          await http
+              .post(Uri.parse(
+                  'http://127.0.0.1:$port/terminals/$_pid/terminate'))
+              .timeout(const Duration(seconds: 3));
+        } catch (_) {}
+      }
+    }
     await TerminalBridge.kill(id: id);
     if (!_output.isClosed) await _output.close();
   }

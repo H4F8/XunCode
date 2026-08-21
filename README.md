@@ -180,11 +180,9 @@ Pull requests, bug reports, and feature ideas are welcome.
 
 ## Acknowledgments
 
-- **Acode Foundation** — for the noexec bypass approach on Android 13+ and ready-to-use proot binaries. Repository: [Acode-Foundation/Acode](https://github.com/Acode-Foundation/Acode)
-- **bajrangCoder** for **acodex_server (AXS)** — code execution on Android 13+ via `memfd_create`. Repository: [bajrangCoder/acodex_server](https://github.com/bajrangCoder/acodex_server)
-- **PRoot** — user-space chroot without root: [proot-me/proot](https://proot-me.github.io)
 - **Alpine Linux** — lightweight Linux for the terminal: [alpinelinux.org](https://alpinelinux.org)
 - **Monaco Editor** — the code editor engine: [microsoft/monaco-editor](https://github.com/microsoft/monaco-editor)
+- The built-in Android terminal runs a user-space Linux environment via `proot` with a PTY-over-WebSocket execution server; binaries are shipped inside the APK.
 
 ## License
 

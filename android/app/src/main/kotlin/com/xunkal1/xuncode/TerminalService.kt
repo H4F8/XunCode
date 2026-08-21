@@ -186,10 +186,27 @@ class TerminalSession(
 
             // На старых Android proot может молча упасть — проверяем,
             // что процесс жив хотя бы 300 мс, иначе fallback.
+            // Перед fallback'ом вытаскиваем его последние слова — без них
+            // невозможно понять, что именно не так на устройстве.
             Thread.sleep(300)
             if (!p.isAlive) {
                 val exit = try { p.exitValue() } catch (_: Throwable) { -1 }
-                emit("[terminal] proot exited early (code $exit), using limited shell\n")
+                val dying = runCatching {
+                    val sb = StringBuilder()
+                    val buf = CharArray(1024)
+                    val r = InputStreamReader(p.inputStream, Charsets.UTF_8)
+                    while (r.ready()) {
+                        val n = r.read(buf)
+                        if (n <= 0) break
+                        sb.append(buf, 0, n)
+                    }
+                    sb.toString().trim().replace("\n", " | ").take(400)
+                }.getOrDefault("")
+                emit(if (dying.isNotBlank()) {
+                    "[terminal] proot exited early (code $exit): $dying\n"
+                } else {
+                    "[terminal] proot exited early (code $exit), using limited shell\n"
+                })
                 return startSystemSh()
             }
 

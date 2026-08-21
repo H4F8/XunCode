@@ -241,7 +241,7 @@ class _EditorScreenState extends State<EditorScreen> {
                       ),
                 body: SafeArea(
                   child: filesModel.active == null
-                      // Как в Acode: без открытых файлов показываем меню,
+                      // Без открытых файлов показываем стартовое меню,
                       // а не полотно редактора.
                       ? EditorHome(
                           onOpenFile: _openFile,

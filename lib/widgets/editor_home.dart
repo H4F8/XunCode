@@ -8,7 +8,7 @@ import '../services/file_service.dart';
 import '../services/language_service.dart';
 import 'file_tree.dart';
 
-/// Стартовый экран редактора в духе Acode: пока не открыт ни один файл,
+/// Стартовый экран редактора: пока не открыт ни один файл,
 /// вместо полотна Monaco показывается меню — недавние файлы и дерево
 /// папки Projects. Брендинг строго XunCode: название текстом, без фото.
 class EditorHome extends StatefulWidget {
