@@ -103,15 +103,26 @@ class TerminalBridge {
   }
 
   static Future<void> _ensureAxs() async {
-    if (_axsProcess != null) return;
     if (_isDesktop) return; // no AXS on desktop
+    // Упавший движок перезапускаем автоматически.
+    if (_axsProcess != null) {
+      final alive = await _processAlive(_axsProcess);
+      if (alive) return;
+      _axsProcess = null;
+      _axsPort = null;
+    }
     final axs = await _axsBinary();
     final nativeDir =
         await _method.invokeMethod<String>('getNativeLibraryDir') ?? '';
     final rootfs = await rootfsPath();
 
-    // Сервер спавнит команду из -c внутри настоящего PTY на каждую сессию.
-    // Порт 0 — авто-выбор свободного; реальный порт читаем из stdout.
+    // proot распаковывает свой загрузчик во временный каталог: без
+    // доступного PROOT_TMP_DIR он умирает мгновенно на Android.
+    final tmpRoot = Directory(FileService.tmpDir);
+    if (!await tmpRoot.exists()) await tmpRoot.create(recursive: true);
+    final prootTmp = Directory('${tmpRoot.path}/proot-tmp');
+    if (!await prootTmp.exists()) await prootTmp.create(recursive: true);
+
     // ВАЖНО: environment в dart:io ПОЛНОСТЬЮ заменяет окружение —
     // наследуем родительское, иначе дочерние процессы остаются без PATH.
     _axsProcess = await Process.start(axs.path, [
@@ -120,7 +131,9 @@ class TerminalBridge {
     ], environment: {
       ...Platform.environment,
       'LD_LIBRARY_PATH': nativeDir,
-      'HOME': Directory(rootfs).parent.path,
+      'PROOT_TMP_DIR': prootTmp.path,
+      'TMPDIR': prootTmp.path,
+      'HOME': tmpRoot.path,
     });
 
     // Сервер логирует «listening on 127.0.0.1:PORT» (ранние сборки писали
@@ -201,6 +214,36 @@ class TerminalBridge {
     _axsProcess?.kill();
     _axsProcess = null;
     _axsPort = null;
+  }
+
+  static Future<bool> _processAlive(Process? p) async {
+    if (p == null) return false;
+    try {
+      await p.exitCode.timeout(const Duration(milliseconds: 1));
+      return false; // уже завершился
+    } on TimeoutException {
+      return true;
+    }
+  }
+
+  /// Разовое выполнение команды внутри Alpine (эндпоинт /execute-command).
+  /// Возвращает вывод команды. Работает только при поднятом движке.
+  static Future<String?> execCommand(String command, {String? cwd}) async {
+    if (_isDesktop) return null;
+    await _ensureAxs();
+    final port = _axsPort;
+    if (port == null) return null;
+    try {
+      final res = await http.post(
+        Uri.parse('http://127.0.0.1:$port/execute-command'),
+        body: jsonEncode({'command': command, 'cwd': cwd ?? ''}),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 30));
+      if (res.statusCode != 200) return null;
+      return res.body;
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Создаёт PTY-сессию на сервере: POST /terminals → текстовый pid.
