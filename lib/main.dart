@@ -74,10 +74,13 @@ class _UpdateGate extends StatefulWidget {
   State<_UpdateGate> createState() => _UpdateGateState();
 }
 
-class _UpdateGateState extends State<_UpdateGate> {
+class _UpdateGateState extends State<_UpdateGate> with WidgetsBindingObserver {
+  DateTime _lastCheck = DateTime.fromMillisecondsSinceEpoch(0);
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Даём IDE открыться мгновенно; проверка идёт в фоне.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
@@ -86,9 +89,27 @@ class _UpdateGateState extends State<_UpdateGate> {
     });
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Вернулись из фона: релиз могли отредактировать/опубликовать, пока
+    // приложение висело открытым. Перепроверяем не чаще раза в 5 минут.
+    if (state != AppLifecycleState.resumed || !mounted || !_accepted) return;
+    if (DateTime.now().difference(_lastCheck) < const Duration(minutes: 5)) {
+      return;
+    }
+    _runUpdateCheck();
+  }
+
   bool get _accepted => SettingsService.instance.agreementAccepted;
 
   Future<void> _runUpdateCheck() async {
+    _lastCheck = DateTime.now();
     final model = context.read<UpdateModel>();
     await model.check();
     _maybeShowHardBlock(model);

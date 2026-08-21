@@ -19,6 +19,7 @@ import '../services/update_service.dart';
 import '../widgets/update_dialog.dart';
 import 'about_screen.dart';
 import 'github_signin_screen.dart';
+import 'hard_update_screen.dart';
 import 'installed_plugins_screen.dart';
 import 'languages_screen.dart';
 import 'plugin_docs_screen.dart';
@@ -508,6 +509,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(lang.tr('update.check_failed')),
         backgroundColor: VscodeTheme.red,
+      ));
+      return;
+    }
+    if (res.hasHardUpdate) {
+      // Критический релиз — сразу тотальная блокировка, без диалога.
+      final model = context.read<UpdateModel>();
+      await model.adopt(res);
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).push(PageRouteBuilder(
+        pageBuilder: (_, __, ___) => HardUpdateScreen(result: res),
+        transitionDuration: const Duration(milliseconds: 250),
+        transitionsBuilder: (_, animation, __, child) =>
+            FadeTransition(opacity: animation, child: child),
       ));
       return;
     }

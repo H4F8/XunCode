@@ -35,6 +35,18 @@ class UpdateModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Подхватить уже полученный результат (ручная проверка из настроек),
+  /// не выполняя повторный сетевой запрос.
+  Future<void> adopt(UpdateCheckResult res) async {
+    _result = res;
+    if (!res.hasUpdate) {
+      await _settings.setHasUpdate(false);
+    } else if (!res.hasHardUpdate) {
+      await _settings.setHasUpdate(true);
+    }
+    notifyListeners();
+  }
+
   /// Фоновая проверка при запуске приложения (Шаг 3 ТЗ).
   ///
   /// Ошибка сети игнорируется полностью — офлайн-режим священен.

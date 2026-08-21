@@ -83,13 +83,18 @@ class GithubRelease {
 
   /// Список платформ из маркера `[HARD UPDATE: GITHUB, RUSTORE]`.
   /// Пустой список — маркера нет.
+  ///
+  /// Скобки опциональны: принимается и «голый» вариант на отдельной
+  /// строке — `HARD UPDATE: GITHUB`, как его часто пишут вручную при
+  /// редактировании релиза на GitHub.
   static List<String> hardUpdatePlatforms(String body) {
-    final m = RegExp(r'\[\s*HARD\s+UPDATE\s*:\s*([A-Za-z_,\s]+)\]',
-            caseSensitive: false)
-        .firstMatch(body);
+    final m = RegExp(
+      r'\[\s*HARD\s+UPDATE\s*:\s*([A-Za-z_,\s]+?)\s*\]|^\s*HARD\s+UPDATE\s*:\s*([A-Za-z_,\s]+?)\s*$',
+      multiLine: true,
+      caseSensitive: false,
+    ).firstMatch(body);
     if (m == null) return const [];
-    return m
-        .group(1)!
+    return (m.group(1) ?? m.group(2) ?? '')
         .split(',')
         .map((e) => e.trim().toUpperCase())
         .where((e) => e.isNotEmpty)
@@ -162,7 +167,7 @@ class UpdateService {
 
   /// Версия по умолчанию для desktop-сборок; на Android берётся из
   /// PackageManager, поэтому здесь она только запасная.
-  static const _fallbackVersion = '1.1.4';
+  static const _fallbackVersion = '1.1.5';
 
   /// Определить источник установки (Шаг 3.1 ТЗ).
   static Future<InstallPlatform> detectPlatform() async {
