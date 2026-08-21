@@ -28,13 +28,13 @@
       <header class="topbar">
         <div id="tab-bar" class="tab-bar"></div>
         <div class="topbar-actions">
-          <button id="new-file-btn" class="icon-btn" title="New file">
+          <button id="new-file-btn" class="icon-btn" title="Ctrl+N">
             <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
           </button>
-          <button id="open-file-btn" class="icon-btn" title="Open file">
+          <button id="open-file-btn" class="icon-btn" title="Ctrl+O">
             <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
           </button>
-          <button id="save-file-btn" class="icon-btn" title="Save file">
+          <button id="save-file-btn" class="icon-btn" title="Ctrl+S">
             <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
           </button>
         </div>
@@ -42,6 +42,16 @@
 
       <section id="view-editor" class="view active">
         <div id="editor-container" class="editor-container"></div>
+        <footer class="status-bar">
+          <div class="status-left">
+            <span id="status-message" data-i18n="status_ready">Готово</span>
+          </div>
+          <div class="status-right">
+            <span id="status-lang">plain</span>
+            <span id="status-position" data-i18n="status_line_col" data-vars-L="1" data-vars-C="1">Стр 1, Кол 1</span>
+            <span class="platform-badge">Desktop</span>
+          </div>
+        </footer>
       </section>
 
       <section id="view-marketplace" class="view">
@@ -80,9 +90,25 @@
                 <option value="light">Light</option>
               </select>
             </label>
+          </div>
+
+          <div class="setting-group">
+            <h2 data-i18n="settings_editor">Редактор</h2>
             <label>
               <span data-i18n="settings_font_size">Размер шрифта редактора</span>
               <input id="setting-font-size" type="number" min="8" max="32" value="14" />
+            </label>
+            <label>
+              <span data-i18n="settings_word_wrap">Перенос строк</span>
+              <select id="setting-word-wrap">
+                <option value="on">On</option>
+                <option value="off">Off</option>
+                <option value="wordWrapColumn">Column</option>
+              </select>
+            </label>
+            <label>
+              <span data-i18n="settings_minimap">Миникарта</span>
+              <input id="setting-minimap" type="checkbox" checked />
             </label>
           </div>
 
