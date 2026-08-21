@@ -589,9 +589,8 @@ class _EditorScreenState extends State<EditorScreen> {
           transparentBackground: true,
           cacheEnabled: true,
           cacheMode: CacheMode.LOAD_DEFAULT,
-          // Гибридная композиция: без неё на Android ломается IME —
-          // буквы пропускаются или дублируются при быстром наборе.
-          useHybridComposition: true,
+          // ВАЖНО: useHybridComposition НЕ включать — в этом режиме у
+          // inappwebview клавиатура перестаёт открываться по тапу.
         ),
         onWebViewCreated: (ctrl) {
           _webCtrl = ctrl;
