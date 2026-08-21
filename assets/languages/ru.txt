@@ -143,6 +143,7 @@ settings.completion.max_items=Макс. подсказок
 
 # Язык
 settings.language.system=Как в системе
+settings.language.path_copied=Путь скопирован в буфер обмена: {path}
 settings.language.open_folder=Открыть папку Languages
 settings.language.refresh=Обновить список языков
 settings.language.folder_path=Папка: {path}

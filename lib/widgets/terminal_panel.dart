@@ -38,21 +38,18 @@ class _TerminalPanelState extends State<TerminalPanel> with TickerProviderStateM
   Future<void> _bootstrap() async {
     final installed = await TerminalBridge.isAlpineInstalled();
     if (!installed) {
-      // Если rootfs встроен в APK — распаковываем его и сразу открываем Alpine.
-      // Иначе открываем ограниченный shell параллельно с загрузкой.
-      if (await TerminalBridge.hasEmbeddedRootfs()) {
-        _installAlpine();
-        await _newTab();
-      } else {
-        await _newTab(unsandboxed: true);
-        _installAlpine();
-      }
-      return;
+      // Сначала дожидаемся установки rootfs (прогресс уже на экране),
+      // и только потом открываем сессию. Прежняя версия открывала вкладку
+      // параллельно — proot не находил /bin/sh в недораспакованном rootfs
+      // и навсегда падал в Limited Android Shell.
+      final ok = await _installAlpine();
+      if (!ok || !mounted) return; // ошибка показана, есть Retry / Limited shell
     }
     await _newTab();
   }
 
-  Future<void> _installAlpine() async {
+  /// Возвращает true при успешной установке.
+  Future<bool> _installAlpine() async {
     final cancelToken = CancelToken();
     setState(() {
       _installing = true;
@@ -73,13 +70,14 @@ class _TerminalPanelState extends State<TerminalPanel> with TickerProviderStateM
         },
       );
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) return false;
       if (cancelToken.isCancelled) {
         final lang = LanguageService.of(context);
         setState(() => _installError = lang.tr('terminal.cancelled'));
       } else {
         setState(() => _installError = 'Install failed: $e');
       }
+      return false;
     } finally {
       if (mounted) {
         setState(() {
@@ -88,6 +86,7 @@ class _TerminalPanelState extends State<TerminalPanel> with TickerProviderStateM
         });
       }
     }
+    return true;
   }
 
   void _cancelInstall() {

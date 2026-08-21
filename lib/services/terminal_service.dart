@@ -53,6 +53,11 @@ class TerminalBridge {
     await axsDir.create(recursive: true);
     final byteData = await rootBundle.load('assets/axs/axs');
     await axsFile.writeAsBytes(byteData.buffer.asUint8List());
+    // Без +x Process.start упадёт с Permission denied. dart:io не умеет
+    // chmod, поэтому зовём системный chmod (toybox есть на всех Android).
+    try {
+      await Process.run('chmod', ['755', axsFile.path]);
+    } catch (_) {}
     return axsFile;
   }
 

@@ -143,6 +143,7 @@ settings.completion.max_items=Max suggestions
 
 # Language
 settings.language.system=Use system language
+settings.language.path_copied=Path copied to clipboard: {path}
 settings.language.open_folder=Open Languages folder
 settings.language.refresh=Refresh language list
 settings.language.folder_path=Folder: {path}

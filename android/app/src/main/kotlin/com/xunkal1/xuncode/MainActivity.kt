@@ -155,6 +155,30 @@ class MainActivity : FlutterActivity() {
                     if (!ok) ok = runCatching { startActivity(fallback); true }.getOrDefault(false)
                     result.success(ok)
                 }
+                "openPath" -> {
+                    // Открыть папку в системном файловом менеджере.
+                    // file:// через url_launcher на Android 8+ не работает
+                    // (FileUriExposedException), нужен SAF document URI.
+                    val path = call.argument<String>("path")
+                    if (path == null) {
+                        result.error("ARG", "missing path", null)
+                    } else {
+                        result.success(runCatching {
+                            val dir = java.io.File(path)
+                            if (!dir.exists()) dir.mkdirs()
+                            val rel = dir.absolutePath
+                                .removePrefix("/storage/emulated/0/")
+                                .removePrefix("/")
+                            val docUri = android.provider.DocumentsContract.buildDocumentUri(
+                                "com.android.externalstorage.documents", "primary:$rel")
+                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW)
+                                .setDataAndType(docUri, "vnd.android.document/directory")
+                                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            startActivity(intent)
+                            true
+                        }.getOrDefault(false))
+                    }
+                }
                 else -> result.notImplemented()
             }
         }

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../app/theme.dart';
@@ -129,12 +130,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _openLanguagesFolder() async {
     final lang = LanguageService.of(context, listen: false);
     final path = FileService.languagesDir;
-    final uri = Uri.parse('file://$path');
-    final opened = await canLaunchUrl(uri).then((ok) =>
-      ok ? launchUrl(uri, mode: LaunchMode.externalApplication) : Future.value(false));
+    // Папка должна существовать до открытия.
+    try {
+      await Directory(path).create(recursive: true);
+    } catch (_) {}
+
+    // file:// через url_launcher на Android блокируется — открываем
+    // нативно через SAF document URI, при неудаче копируем путь.
+    bool opened = false;
+    try {
+      opened = await const MethodChannel('com.xunkal1.xuncode/update')
+              .invokeMethod<bool>('openPath', {'path': path}) ??
+          false;
+    } catch (_) {}
+
     if (!opened && mounted) {
+      await Clipboard.setData(ClipboardData(text: path));
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(lang.tr('settings.language.folder_path', params: {'path': path})),
+        content: Text(lang.tr('settings.language.path_copied',
+            params: {'path': path})),
         backgroundColor: VscodeTheme.accent,
       ));
     }
