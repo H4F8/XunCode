@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../app/theme.dart';
 import '../services/feedback_service.dart';
@@ -57,16 +58,17 @@ class _ReportSheetState extends State<_ReportSheet>
   }
 
   Future<void> _openMarket() async {
-    const channel = MethodChannel('com.xunkal1.xuncode/update');
+    // Каталог разработчика (самохостинг) — открываем во внешнем браузере.
+    final uri = Uri.parse(FeedbackService.marketUrl);
+    bool opened = false;
     try {
-      final ok = await channel.invokeMethod<bool>('openRustoreAppPage');
-      if (ok == true || !mounted) return;
+      if (await canLaunchUrl(uri)) {
+        opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
     } catch (_) {}
+    if (opened || !mounted) return;
     if (!mounted) return;
-    // Фолбэк: копируем ссылку на страницу приложения.
-    await Clipboard.setData(const ClipboardData(
-      text: 'https://www.rustore.ru/catalog/app/com.xunkal1.xuncode',
-    ));
+    await Clipboard.setData(ClipboardData(text: FeedbackService.marketUrl));
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(LanguageService.of(context).tr('feedback.link_copied')),
       backgroundColor: VscodeTheme.accent,

@@ -20,6 +20,9 @@ class FeedbackService {
   static const _botToken = 'PUT_BOT_TOKEN_HERE';
   static const _chatId = 'PUT_CHAT_ID_HERE';
 
+  /// Каталог приложений разработчика (самохостинг).
+  static const marketUrl = 'https://vscodemobile-market.vercel.app/';
+
   static bool get configured =>
       !_botToken.startsWith('PUT_') && !_chatId.startsWith('PUT_');
 

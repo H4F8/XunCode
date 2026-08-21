@@ -85,7 +85,7 @@ class LanguageService extends ChangeNotifier {
     final dir = Directory(FileService.languagesDir);
     if (!await dir.exists()) await dir.create(recursive: true);
 
-    const bundleVersion = '5';
+    const bundleVersion = '6';
     final marker = _settings.bundleVersion;
     final allBuiltinPresent = await _bundledLanguagesPresent(dir);
     if (marker == bundleVersion && allBuiltinPresent) return;
