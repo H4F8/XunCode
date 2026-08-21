@@ -89,6 +89,14 @@ settings.title=Settings
 # Settings sections
 settings.section.appearance=Appearance
 settings.section.editor=Editor
+settings.editor_theme=Editor theme
+
+# Start screen (menu instead of editor)
+home.subtitle=Mobile code editor
+home.recent=Recent
+home.files=Project files
+home.empty_tree=The Projects folder is empty. Create a file or open an existing one via the folder icon above.
+home.import=Open file…
 settings.section.completion=Code Completion
 settings.section.language=Language
 settings.section.sync=Sync

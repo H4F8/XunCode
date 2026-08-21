@@ -89,6 +89,14 @@ settings.title=Настройки
 # Разделы настроек
 settings.section.appearance=Внешний вид
 settings.section.editor=Редактор
+settings.editor_theme=Тема редактора
+
+# Стартовый экран (меню вместо редактора)
+home.subtitle=Мобильный редактор кода
+home.recent=Недавние
+home.files=Файлы проекта
+home.empty_tree=Папка Projects пуста. Создайте файл или откройте существующий через иконку папки выше.
+home.import=Открыть файл…
 settings.section.completion=Автодополнение
 settings.section.language=Язык
 settings.section.sync=Синхронизация

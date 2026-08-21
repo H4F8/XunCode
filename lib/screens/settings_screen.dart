@@ -23,6 +23,19 @@ import 'languages_screen.dart';
 import 'plugin_docs_screen.dart';
 import 'user_agreement_screen.dart';
 
+const _editorThemes = <String, String>{
+  'XunCode Dark': 'xuncode-dark',
+  'Dracula': 'dracula',
+  'Monokai': 'monokai',
+  'GitHub Dark': 'github-dark',
+  'VS Dark': 'vs-dark',
+  'VS Light': 'vs',
+};
+
+String _editorThemeLabel(String id) => _editorThemes.entries
+    .firstWhere((e) => e.value == id, orElse: () => _editorThemes.entries.first)
+    .key;
+
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -170,6 +183,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             (v) => s.set('fontFamily', v!)),
 
           _section(lang.tr('settings.section.editor')),
+          _dropdown(context, lang.tr('settings.editor_theme'),
+            _editorThemeLabel(s.editorTheme),
+            _editorThemes.keys.toList(),
+            (v) => s.set('editor.theme', _editorThemes[v] ?? 'xuncode-dark')),
           _dropdown(context, lang.tr('settings.tab_size'), s.tabSize.toString(),
             const ['2', '4', '8'], (v) => s.set('tabSize', int.parse(v!))),
           _toggle(context, lang.tr('settings.word_wrap'), s.wordWrap,

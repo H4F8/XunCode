@@ -19,6 +19,7 @@ class SettingsService {
 
   double get fontSize => _prefs.getDouble('fontSize') ?? 14.0;
   String get fontFamily => _prefs.getString('fontFamily') ?? 'JetBrains Mono';
+  String get editorTheme => _prefs.getString('editor.theme') ?? 'xuncode-dark';
   int get tabSize => _prefs.getInt('tabSize') ?? 2;
   bool get wordWrap => _prefs.getBool('wordWrap') ?? true;
   String get autoSave => _prefs.getString('autoSave') ?? 'off';

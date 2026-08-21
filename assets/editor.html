@@ -17,10 +17,113 @@
 require.config({ paths: { vs: 'monaco/vs' } });
 require(['vs/editor/editor.main'], function() {
 
+  // ── Темы оформления ─────────────────────────────────────────────────────
+  function _theme(name, base, colors, rules) {
+    monaco.editor.defineTheme(name, {
+      base: base, inherit: true, rules: rules, colors: colors,
+    });
+  }
+
+  // Дефолтная тема в духе One Dark (как у Acode)
+  _theme('xuncode-dark', 'vs-dark', {
+    'editor.background': '#282c34',
+    'editor.foreground': '#abb2bf',
+    'editor.lineHighlightBackground': '#2c313a',
+    'editorLineNumber.foreground': '#495162',
+    'editorLineNumber.activeForeground': '#abb2bf',
+    'editorCursor.foreground': '#528bff',
+    'editor.selectionBackground': '#3e4451',
+    'editor.inactiveSelectionBackground': '#333842',
+    'editorIndentGuide.background': '#3b4048',
+    'editorIndentGuide.activeBackground': '#6b7280',
+    'editorWidget.background': '#21252b',
+    'editorWidget.border': '#181a1f',
+    'editorSuggestWidget.selectedBackground': '#2c313a',
+    'scrollbarSlider.background': '#4e566680',
+    'scrollbarSlider.hoverBackground': '#5a637480',
+    'scrollbarSlider.activeBackground': '#747d9080',
+  }, [
+    { token: 'comment', foreground: '5c6370', fontStyle: 'italic' },
+    { token: 'string', foreground: '98c379' },
+    { token: 'number', foreground: 'd19a66' },
+    { token: 'keyword', foreground: 'c678dd' },
+    { token: 'type', foreground: 'e5c07b' },
+    { token: 'function', foreground: '61afef' },
+    { token: 'tag', foreground: 'e06c75' },
+    { token: 'attribute.name', foreground: 'd19a66' },
+    { token: 'attribute.value', foreground: '98c379' },
+    { token: 'regexp', foreground: '56b6c2' },
+  ]);
+
+  _theme('dracula', 'vs-dark', {
+    'editor.background': '#282a36',
+    'editor.foreground': '#f8f8f2',
+    'editor.lineHighlightBackground': '#343746',
+    'editorLineNumber.foreground': '#6272a4',
+    'editorLineNumber.activeForeground': '#f8f8f2',
+    'editorCursor.foreground': '#f8f8f0',
+    'editor.selectionBackground': '#44475a',
+    'editorIndentGuide.background': '#3d4050',
+    'editorWidget.background': '#21222c',
+  }, [
+    { token: 'comment', foreground: '6272a4', fontStyle: 'italic' },
+    { token: 'string', foreground: 'f1fa8c' },
+    { token: 'number', foreground: 'bd93f9' },
+    { token: 'keyword', foreground: 'ff79c6' },
+    { token: 'type', foreground: '8be9fd', fontStyle: 'italic' },
+    { token: 'function', foreground: '50fa7b' },
+    { token: 'tag', foreground: 'ff79c6' },
+    { token: 'attribute.name', foreground: '50fa7b' },
+    { token: 'attribute.value', foreground: 'f1fa8c' },
+  ]);
+
+  _theme('monokai', 'vs-dark', {
+    'editor.background': '#272822',
+    'editor.foreground': '#f8f8f2',
+    'editor.lineHighlightBackground': '#3e3d32',
+    'editorLineNumber.foreground': '#90908a',
+    'editorLineNumber.activeForeground': '#f8f8f2',
+    'editorCursor.foreground': '#f8f8f0',
+    'editor.selectionBackground': '#49483e',
+    'editorWidget.background': '#1e1f1c',
+  }, [
+    { token: 'comment', foreground: '88846f', fontStyle: 'italic' },
+    { token: 'string', foreground: 'e6db74' },
+    { token: 'number', foreground: 'ae81ff' },
+    { token: 'keyword', foreground: 'f92672' },
+    { token: 'type', foreground: '66d9ef', fontStyle: 'italic' },
+    { token: 'function', foreground: 'a6e22e' },
+    { token: 'tag', foreground: 'f92672' },
+    { token: 'attribute.name', foreground: 'a6e22e' },
+    { token: 'attribute.value', foreground: 'e6db74' },
+  ]);
+
+  _theme('github-dark', 'vs-dark', {
+    'editor.background': '#0d1117',
+    'editor.foreground': '#c9d1d9',
+    'editor.lineHighlightBackground': '#161b22',
+    'editorLineNumber.foreground': '#6e7681',
+    'editorLineNumber.activeForeground': '#c9d1d9',
+    'editorCursor.foreground': '#58a6ff',
+    'editor.selectionBackground': '#264f78',
+    'editorIndentGuide.background': '#21262d',
+    'editorWidget.background': '#161b22',
+  }, [
+    { token: 'comment', foreground: '8b949e' },
+    { token: 'string', foreground: 'a5d6ff' },
+    { token: 'number', foreground: '79c0ff' },
+    { token: 'keyword', foreground: 'ff7b72' },
+    { token: 'type', foreground: 'ffa657' },
+    { token: 'function', foreground: 'd2a8ff' },
+    { token: 'tag', foreground: '7ee787' },
+    { token: 'attribute.name', foreground: '79c0ff' },
+    { token: 'attribute.value', foreground: 'a5d6ff' },
+  ]);
+
   window.editor = monaco.editor.create(document.getElementById('editor'), {
     value: '',
     language: 'plaintext',
-    theme: 'vs-dark',
+    theme: 'xuncode-dark',
     fontSize: 14,
     fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
     fontLigatures: true,
@@ -28,7 +131,19 @@ require(['vs/editor/editor.main'], function() {
     minimap: { enabled: false },
     wordWrap: 'on',
     lineNumbers: 'on',
+    lineNumbersMinChars: 3,
     renderLineHighlight: 'all',
+    renderLineHighlightOnlyWhenFocus: true,
+    roundedSelection: true,
+    glyphMargin: false,
+    overviewRulerLanes: 0,
+    hideCursorInOverviewRuler: true,
+    overviewRulerBorder: false,
+    scrollbar: {
+      verticalScrollbarSize: 6,
+      horizontalScrollbarSize: 6,
+      useShadows: false,
+    },
     scrollBeyondLastLine: false,
     smoothScrolling: true,
     cursorBlinking: 'smooth',
@@ -42,7 +157,7 @@ require(['vs/editor/editor.main'], function() {
     folding: true,
     bracketPairColorization: { enabled: true },
     guides: { bracketPairs: true, indentation: true },
-    padding: { top: 8, bottom: 8 },
+    padding: { top: 12, bottom: 12 },
   });
 
   const _workspaceFiles = new Map();
@@ -313,6 +428,7 @@ require(['vs/editor/editor.main'], function() {
   };
 
   window.applySettings = function(s) {
+    if (s.theme) monaco.editor.setTheme(s.theme);
     window.editor.updateOptions({
       fontSize: s.fontSize || 14,
       fontFamily: s.fontFamily ? `'${s.fontFamily}', monospace` : undefined,

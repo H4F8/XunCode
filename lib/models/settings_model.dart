@@ -10,6 +10,7 @@ class SettingsModel extends ChangeNotifier {
   ThemeMode get themeMode => _svc.themeMode;
   double get fontSize => _svc.fontSize;
   String get fontFamily => _svc.fontFamily;
+  String get editorTheme => _svc.editorTheme;
   int get tabSize => _svc.tabSize;
   bool get wordWrap => _svc.wordWrap;
   String get autoSave => _svc.autoSave;

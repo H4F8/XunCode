@@ -19,6 +19,7 @@ import '../services/editor_bridge.dart';
 import '../widgets/activity_bar.dart';
 import '../widgets/command_palette.dart';
 import '../widgets/desktop_menu.dart';
+import '../widgets/editor_home.dart';
 import '../widgets/sidebar.dart';
 import '../widgets/tab_bar.dart';
 import '../widgets/status_bar.dart';
@@ -109,6 +110,7 @@ class _EditorScreenState extends State<EditorScreen> {
   void _openFile(String path, String name, String content) {
     final filesModel = context.read<OpenFilesModel>();
     filesModel.open(OpenFile(uri: path, name: name, content: content));
+    unawaited(RecentFiles.push(path, name));
     _loadInEditor(content, name);
     PluginRuntime.instance.fireFileOpen(path);
     _maybeIndexProject(path);
@@ -238,7 +240,14 @@ class _EditorScreenState extends State<EditorScreen> {
                         onFileOpen: _openFile,
                       ),
                 body: SafeArea(
-                  child: Column(
+                  child: filesModel.active == null
+                      // Как в Acode: без открытых файлов показываем меню,
+                      // а не полотно редактора.
+                      ? EditorHome(
+                          onOpenFile: _openFile,
+                          onImportFile: _pickAndOpenFile,
+                        )
+                      : Column(
                     children: [
                       if (PlatformInfo.isDesktop)
                         DesktopMenuBar(
@@ -698,6 +707,7 @@ class _EditorScreenState extends State<EditorScreen> {
       'fontFamily': s.fontFamily,
       'tabSize': s.tabSize,
       'wordWrap': s.wordWrap ? 'on' : 'off',
+      'theme': s.editorTheme,
     });
     await _webCtrl?.evaluateJavascript(source: 'window.applySettings && window.applySettings($payload);');
     final completionPayload = jsonEncode({
