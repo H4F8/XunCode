@@ -25,6 +25,12 @@ class OpenFilesModel extends ChangeNotifier {
   void open(OpenFile file) {
     final existing = files.indexWhere((f) => f.uri == file.uri);
     if (existing >= 0) {
+      // Файл мог измениться на диске после открытия вкладки — обновляем
+      // содержимое свежепрочитанным. Несохранённые правки не трогаем.
+      final old = files[existing];
+      if (!old.isDirty && file.content != old.content) {
+        old.content = file.content;
+      }
       activeIndex = existing;
     } else {
       files.add(file);
