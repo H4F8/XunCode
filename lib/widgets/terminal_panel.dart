@@ -18,6 +18,10 @@ class TermTab {
   final StringBuffer back = StringBuffer();
   StreamSubscription<String>? sub;
 
+  /// Терминал подключён к AXS напрямую из WebView (AttachAddon),
+  /// как в AcodeX — Dart-мост вывода для этой вкладки не используется.
+  bool attachedToWs = false;
+
   TermTab({required this.id, required this.name, required this.session});
 
   void appendBack(String chunk) {
@@ -168,6 +172,24 @@ class _TerminalPanelState extends State<TerminalPanel> {
     tab.sub = session.output.listen((chunk) => _route(tab, chunk));
     setState(() => _tabs.add(tab));
     await _activate(_tabs.length - 1);
+    await _attachDirectIfPossible(tab);
+  }
+
+  /// Прямое подключение эмулятора к AXS (архитектура AcodeX):
+  /// ввод/вывод через WebSocket прямо в WebView, минуя Dart-мост.
+  Future<void> _attachDirectIfPossible(TermTab tab) async {
+    final s = tab.session;
+    final port = s.axsPort;
+    final pid = s.remotePid;
+    if (!_pageReady || _web == null) return;
+    if (port == null || port <= 0 || pid == null || pid.isEmpty) return;
+    try {
+      await _web!.evaluateJavascript(
+        source:
+            "termApi.attach('${tab.id}', $port, '$pid', ${s.cols}, ${s.rows});",
+      );
+      tab.attachedToWs = true;
+    } catch (_) {}
   }
 
   Future<void> _closeTab(int index) async {
@@ -221,7 +243,8 @@ class _TerminalPanelState extends State<TerminalPanel> {
   }
 
   void _route(TermTab tab, String chunk) {
-    if (!mounted) return;
+    if (!mounted || tab.attachedToWs) return; // вывод уже идёт напрямую по WS
+
     if (tab.id != _tabs.elementAtOrNull(_active)?.id) {
       tab.appendBack(chunk);
       return;
@@ -454,7 +477,12 @@ class _TerminalPanelState extends State<TerminalPanel> {
         source: "termApi.create('${t.id}', 80, 24);",
       );
     }
-    if (_active >= 0 && _active < _tabs.length) {
+    for (final t in _tabs) {
+      await _attachDirectIfPossible(t);
+    }
+    final legacyActive =
+        _active >= 0 && _active < _tabs.length && !_tabs[_active].attachedToWs;
+    if (legacyActive) {
       await _showTab(_tabs[_active]);
     }
   }

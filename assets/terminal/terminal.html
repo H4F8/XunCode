@@ -6,6 +6,10 @@
 <link rel="stylesheet" href="xterm.min.css">
 <script src="xterm.min.js"></script>
 <script src="addon-fit.min.js"></script>
+<script src="addon-attach.min.js"></script>
+<script src="addon-webgl.min.js"></script>
+<script src="addon-search.min.js"></script>
+<script src="addon-unicode11.min.js"></script>
 <script src="addon-web-links.min.js"></script>
 <style>
   html, body {
@@ -37,7 +41,8 @@
   'use strict';
 
   var currentId = null;
-  var terms = {}; // id -> {term, fit, container}
+  // id -> { term, fit, container, ws?, attached?, resizeHandler? }
+  var terms = {};
 
   function theme() {
     return {
@@ -67,6 +72,23 @@
 
   function fitSafe(t) { try { t.fit.fit(); } catch (e) {} }
 
+  function loadAddons(t) {
+    var fit = new FitAddon.FitAddon();
+    t.term.loadAddon(fit);
+    t.fit = fit;
+    try { var u11 = new Unicode11Addon.Unicode11Addon(); t.term.loadAddon(u11); t.term.unicode.activeVersion = '11'; } catch (e) {}
+    try { t.term.loadAddon(new WebLinksAddon.WebLinksAddon()); } catch (e) {}
+    try { t.search = new SearchAddon.SearchAddon(); t.term.loadAddon(t.search); } catch (e) {}
+    // WebGL-рендерер как в AcodeX; при неудаче остаётся DOM-рендер.
+    setTimeout(function () {
+      try {
+        var gl = new WebglAddon.WebglAddon();
+        gl.onContextLoss(function () { gl.dispose(); });
+        t.term.loadAddon(gl);
+      } catch (e) {}
+    }, 50);
+  }
+
   function create(id, cols, rows) {
     if (terms[id]) return;
     var container = document.createElement('div');
@@ -85,27 +107,64 @@
     });
     if (cols && rows) term.resize(cols, rows);
 
-    var fit = new FitAddon.FitAddon();
-    term.loadAddon(fit);
-    try {
-      term.loadAddon(new WebLinksAddon.WebLinksAddon());
-    } catch (e) {}
+    var t = { term: term, fit: null, container: container, ws: null, attached: false };
+    loadAddons(t);
     term.open(container);
-    setTimeout(function () { fitSafe({fit: fit}); }, 30);
+    setTimeout(function () { fitSafe(t); }, 30);
 
+    // Ввод уходит в Dart только в legacy-режиме (desktop);
+    // в attached-режиме ввод идёт прямо в WebSocket через AttachAddon.
     term.onData(function (d) {
-      window.flutter_inappwebview.callHandler('termData', d);
+      if (!t.attached) {
+        window.flutter_inappwebview.callHandler('termData', d);
+      }
     });
     term.onResize(function (sz) {
-      window.flutter_inappwebview.callHandler('termResize', sz.cols, sz.rows);
+      if (!t.attached) {
+        window.flutter_inappwebview.callHandler('termResize', sz.cols, sz.rows);
+      } else if (t.wsPort && t.wsPid) {
+        resizeRemote(t, sz.cols, sz.rows);
+      }
     });
 
     if (window.ResizeObserver) {
-      new ResizeObserver(function () { fitSafe({fit: fit}); }).observe(container);
+      new ResizeObserver(function () { fitSafe(t); }).observe(container);
     }
 
-    terms[id] = { term: term, fit: fit, container: container };
+    terms[id] = t;
     if (!currentId) show(id);
+  }
+
+  function resizeRemote(t, cols, rows) {
+    try {
+      fetch('http://127.0.0.1:' + t.wsPort + '/terminals/' + t.wsPid + '/resize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cols: String(cols), rows: String(rows) })
+      }).catch(function () {});
+    } catch (e) {}
+  }
+
+  // Прямое подключение эмулятора к AXS — как в AcodeX:
+  // ввод/вывод идут через AttachAddon, минуя Dart-мост.
+  function attach(id, port, pid, cols, rows) {
+    var t = terms[id];
+    if (!t || t.attached) return;
+    try {
+      var ws = new WebSocket('ws://127.0.0.1:' + port + '/terminals/' + pid);
+      t.ws = ws;
+      t.wsPort = port;
+      t.wsPid = pid;
+      ws.onopen = function () {
+        t.attached = true;
+        try { t.term.loadAddon(new AttachAddon.AttachAddon(ws)); } catch (e) {}
+        if (cols && rows) resizeRemote(t, cols, rows);
+      };
+      ws.onclose = function () {
+        t.attached = false;
+        try { t.term.write('\r\n\x1b[90m[session ended]\x1b[0m\r\n'); } catch (e) {}
+      };
+    } catch (e) {}
   }
 
   function show(id) {
@@ -120,7 +179,7 @@
     }
   }
 
-  // Пишем только в активный терминал: неактивные буферизуются на стороне Dart.
+  // Legacy-режим (desktop / fallback): байты приходят из Dart.
   function write(data) {
     var t = terms[currentId];
     if (t) t.term.write(data);
@@ -129,6 +188,7 @@
   function closeTerm(id) {
     var t = terms[id];
     if (!t) return;
+    try { if (t.ws) t.ws.close(); } catch (e) {}
     try { t.term.dispose(); } catch (e) {}
     t.container.remove();
     delete terms[id];
@@ -141,6 +201,7 @@
 
   window.termApi = {
     create: create,
+    attach: attach,
     show: show,
     write: write,
     closeTerm: closeTerm,
@@ -152,6 +213,10 @@
     },
     refitAll: function () {
       Object.keys(terms).forEach(function (k) { fitSafe(terms[k]); });
+    },
+    searchNext: function (q) {
+      var t = terms[currentId];
+      if (t && t.search) try { t.search.findNext(q); } catch (e) {}
     }
   };
 

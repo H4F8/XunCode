@@ -28,6 +28,11 @@ const routes = {
     list: () => require('./_h/ideas/list'),
     delete: () => require('./_h/ideas/delete'),
   },
+  reports: {
+    submit: () => require('./_h/reports/submit'),
+    list: () => require('./_h/reports/list'),
+    delete: () => require('./_h/reports/delete'),
+  },
   auth: {
     start: () => require('./_h/auth/start'),
     callback: () => require('./_h/auth/callback'),

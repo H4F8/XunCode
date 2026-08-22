@@ -49,10 +49,21 @@ class _ReportSheetState extends State<_ReportSheet>
     setState(() => _state = _SendState.sending);
     final lang = LanguageService.of(context, listen: false);
     final category = lang.tr('feedback.category_$_category');
-    final ok = await FeedbackService.send(
-      category: category,
-      text: _ctrl.text.trim(),
-    );
+    // Приоритет — сайт: отчёт попадает напрямую к админам, если выполнен
+    // вход через GitHub. Иначе — старый путь через Telegram-бота.
+    bool ok = false;
+    if (await FeedbackService.signedIn) {
+      ok = await FeedbackService.sendToSite(
+        category: _category,
+        text: _ctrl.text.trim(),
+      );
+    }
+    if (!ok) {
+      ok = await FeedbackService.send(
+        category: category,
+        text: _ctrl.text.trim(),
+      );
+    }
     if (!mounted) return;
     setState(() => _state = ok ? _SendState.sent : _SendState.failed);
   }

@@ -2,7 +2,7 @@
   "rewrites": [
     { "source": "/", "destination": "/public/index.html" },
     { "source": "/admin", "destination": "/public/index.html" },
-    { "source": "/api/(admin|plugins|ideas|auth)/([^/]+)", "destination": "/api/gateway?g=$1&f=$2" }
+    { "source": "/api/(admin|plugins|ideas|auth|reports)/([^/]+)", "destination": "/api/gateway?g=$1&f=$2" }
   ],
   "headers": [
     {

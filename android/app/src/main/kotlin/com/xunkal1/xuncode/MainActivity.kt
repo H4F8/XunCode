@@ -6,7 +6,6 @@ import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private val TOR_CHANNEL = "com.xunkal1.xuncode/tor"
     private val TERMINAL_CHANNEL = "com.xunkal1.xuncode/terminal"
     private val TERMINAL_EVENTS = "com.xunkal1.xuncode/terminal/events"
     private val STORAGE_CHANNEL = "com.xunkal1.xuncode/storage"
@@ -18,29 +17,6 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         terminalService = TerminalService(applicationContext)
-
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, TOR_CHANNEL).setMethodCallHandler { call, result ->
-            when (call.method) {
-                "startTor" -> {
-                    runCatching {
-                        val intent = android.content.Intent("org.torproject.android.intent.action.START")
-                        intent.setPackage("org.torproject.android")
-                        sendBroadcast(intent)
-                    }
-                    result.success(true)
-                }
-                "stopTor" -> {
-                    runCatching {
-                        val intent = android.content.Intent("org.torproject.android.intent.action.STOP")
-                        intent.setPackage("org.torproject.android")
-                        sendBroadcast(intent)
-                    }
-                    result.success(true)
-                }
-                "isRunning" -> result.success(false)
-                else -> result.notImplemented()
-            }
-        }
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, TERMINAL_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {

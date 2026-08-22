@@ -166,8 +166,8 @@ require(['vs/editor/editor.main'], function() {
   function _setCurrentModelMeta(language, filename) {
     const model = window.editor.getModel();
     if (!model) return;
-    model._vscodeFilename = filename || '';
-    model._vscodeLanguage = language || 'plaintext';
+    model._xcFilename = filename || '';
+    model._xcLanguage = language || 'plaintext';
   }
 
   function _buildDefinitionIndex(model) {
@@ -443,7 +443,7 @@ require(['vs/editor/editor.main'], function() {
   const _hooks = { fileSave: [], fileOpen: [], editorReady: [] };
   const _statusItems = [];
 
-  window.VscodePlugin = {
+  window.XuncodePlugin = {
     register(manifest) {
       if (!manifest.id) return console.error('[Plugin] missing id');
       const ctx = _buildCtx(manifest.id);
@@ -456,6 +456,7 @@ require(['vs/editor/editor.main'], function() {
       }
     }
   };
+window.VscodePlugin = window.XuncodePlugin; // alias для старых плагинов;
 
   function _buildCtx(pluginId) {
     const prefix = 'plugin:' + pluginId + ':';

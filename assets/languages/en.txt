@@ -63,8 +63,6 @@ editor.toggle_terminal=Toggle terminal
 tabs.unsaved=•
 
 # Status bar
-status.tor_on=Tor: ON
-status.tor_off=Tor: OFF
 status.line_col=Ln {line}, Col {col}
 status.encoding=UTF-8
 
@@ -101,7 +99,6 @@ settings.section.completion=Code Completion
 settings.section.language=Language
 settings.section.sync=Sync
 settings.section.plugins=Plugins
-settings.section.network=Network
 settings.section.storage=Storage
 settings.section.developer=Developer
 settings.section.updates=Software Update
@@ -163,7 +160,6 @@ settings.plugins.docs=Plugin documentation
 settings.plugins.docs_subtitle=Plugin API reference (RU / EN)
 
 # Network
-settings.network.tor=Tor Proxy (via Orbot)
 
 # Storage
 settings.storage.projects_folder=Projects folder
@@ -237,6 +233,7 @@ libraries.registry_saved=Registry URL saved
 libraries.empty=No results
 libraries.copy_command=Copy install command
 libraries.copied=Command copied
+feedback.title=Report a problem
 feedback.tab_dev=To developer
 feedback.tab_market=Via store
 feedback.category_bug=Bug

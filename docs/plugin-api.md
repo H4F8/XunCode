@@ -1,8 +1,8 @@
 # Plugin API Reference — XunCode (Android)
 
-XunCode plugins are JavaScript files that run inside the Monaco Editor WebView sandbox. Each plugin calls `VscodePlugin.register()` and receives a `ctx` object with full access to the editor, UI, hooks, storage, and HTTP.
+XunCode plugins are JavaScript files that run inside the Monaco Editor WebView sandbox. Each plugin calls `XuncodePlugin.register()` and receives a `ctx` object with full access to the editor, UI, hooks, storage, and HTTP.
 
-> **`xuncode` ≡ `vscode`.** XunCode exposes the same API surface under both `window.vscode` and `window.xuncode`. Existing plugins keep working unchanged; new plugins may use either name.
+> **Primary namespace is `xuncode`.** `window.vscode` and `XuncodePlugin.register()` remain available as aliases for backward compatibility; existing plugins keep working unchanged.
 
 ---
 
@@ -30,7 +30,7 @@ XunCode plugins are JavaScript files that run inside the Monaco Editor WebView s
 ## Quick Start
 
 ```js
-VscodePlugin.register({
+XuncodePlugin.register({
   id: 'my-org.my-plugin',
   name: 'My Plugin',
   version: '1.0.0',
@@ -60,7 +60,7 @@ VscodePlugin.register({
 
 ## Plugin Manifest
 
-Fields passed to `VscodePlugin.register()`:
+Fields passed to `XuncodePlugin.register()`:
 
 | Field | Type | Required | Description |
 |---|---|---|---|
@@ -345,7 +345,7 @@ console.log('Files:', files.join(', '));
 ```
 App starts
   └─ Plugin JS loaded from URL
-       └─ VscodePlugin.register() called
+       └─ XuncodePlugin.register() called
             └─ activate(ctx) called
                  ├─ Register commands
                  ├─ Register hooks
@@ -442,7 +442,7 @@ Once your plugin is hosted and tested:
 **Review criteria:**
 - Plugin must work as described
 - No malicious code (network requests to unknown endpoints, data exfiltration)
-- Must use `VscodePlugin.register()` correctly
+- Must use `XuncodePlugin.register()` correctly
 - Description must be accurate
 - File size under 500KB
 
@@ -453,7 +453,7 @@ Once your plugin is hosted and tested:
 ### Word Counter
 
 ```js
-VscodePlugin.register({
+XuncodePlugin.register({
   id: 'example.word-counter',
   name: 'Word Counter',
   version: '1.0.0',
@@ -489,7 +489,7 @@ VscodePlugin.register({
 ### Auto Header
 
 ```js
-VscodePlugin.register({
+XuncodePlugin.register({
   id: 'example.auto-header',
   name: 'Auto Header',
   version: '1.0.0',
@@ -517,7 +517,7 @@ VscodePlugin.register({
 ### AI Code Review (uses Anthropic API)
 
 ```js
-VscodePlugin.register({
+XuncodePlugin.register({
   id: 'example.ai-review',
   name: 'AI Code Review',
   version: '1.0.0',

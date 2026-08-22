@@ -13,7 +13,6 @@ import '../services/completion_service.dart';
 import '../services/file_service.dart';
 import '../services/language_service.dart';
 import '../services/platform_info.dart';
-import '../services/tor_service.dart';
 import '../services/plugin_runtime.dart';
 import '../services/editor_bridge.dart';
 import '../widgets/activity_bar.dart';
@@ -71,15 +70,6 @@ class _EditorScreenState extends State<EditorScreen> {
   double _terminalHeight = 280;
   String _currentLang = 'plaintext';
   int _line = 1, _col = 1;
-  bool _torEnabled = false;
-
-  @override
-  void initState() {
-    super.initState();
-    TorService.checkStatus().then((v) {
-      if (mounted) setState(() => _torEnabled = v);
-    });
-  }
 
   @override
   void dispose() {
@@ -162,15 +152,6 @@ class _EditorScreenState extends State<EditorScreen> {
     }
   }
 
-  Future<void> _toggleTor() async {
-    if (_torEnabled) {
-      await TorService.stop();
-    } else {
-      await TorService.start();
-    }
-    final status = await TorService.checkStatus();
-    if (mounted) setState(() => _torEnabled = status);
-  }
 
   void _toggleTerminal() => setState(() => _terminalVisible = !_terminalVisible);
 
@@ -428,8 +409,6 @@ class _EditorScreenState extends State<EditorScreen> {
           language: _currentLang,
           line: _line,
           col: _col,
-          torEnabled: _torEnabled,
-          onTorTap: _toggleTor,
           onLangTap: () {},
         ),
       ],
@@ -485,8 +464,6 @@ class _EditorScreenState extends State<EditorScreen> {
           language: _currentLang,
           line: _line,
           col: _col,
-          torEnabled: _torEnabled,
-          onTorTap: _toggleTor,
           onLangTap: () {},
         ),
       ],

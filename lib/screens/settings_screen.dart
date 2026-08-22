@@ -304,10 +304,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 MaterialPageRoute(builder: (_) => const PluginDocsScreen())),
           ),
 
-          _section(lang.tr('settings.section.network')),
-          _toggle(context, lang.tr('settings.network.tor'), s.torEnabled,
-              (v) => s.set('torEnabled', v)),
-
           _section(lang.tr('settings.section.storage')),
           _buildStorageInfo(lang),
           ListTile(

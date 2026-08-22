@@ -23,7 +23,6 @@ class SettingsService {
   int get tabSize => _prefs.getInt('tabSize') ?? 2;
   bool get wordWrap => _prefs.getBool('wordWrap') ?? true;
   String get autoSave => _prefs.getString('autoSave') ?? 'off';
-  bool get torEnabled => _prefs.getBool('torEnabled') ?? false;
   bool get developerMode => _prefs.getBool('developerMode') ?? false;
   String get language => _prefs.getString('language') ?? 'system';
 

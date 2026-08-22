@@ -756,6 +756,13 @@ class TerminalSession {
 
   TerminalSession._(this.id, this.cols, this.rows);
 
+  /// pid сессии на AXS-сервере (null на desktop / unsandboxed).
+  /// Нужен для прямого подключения эмулятора через WebSocket, как в AcodeX.
+  String? get remotePid => _pid;
+
+  /// Порт локального AXS-сервера (null если движок не поднят).
+  int? get axsPort => TerminalBridge._axsPort;
+
   Stream<String> get output => _output.stream;
 
   Future<void> _open() async {

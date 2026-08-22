@@ -7,8 +7,6 @@ class VscodeStatusBar extends StatelessWidget {
   final String language;
   final int line;
   final int col;
-  final bool torEnabled;
-  final VoidCallback onTorTap;
   final VoidCallback onLangTap;
 
   const VscodeStatusBar({
@@ -17,8 +15,6 @@ class VscodeStatusBar extends StatelessWidget {
     required this.language,
     required this.line,
     required this.col,
-    required this.torEnabled,
-    required this.onTorTap,
     required this.onLangTap,
   });
 
@@ -31,13 +27,6 @@ class VscodeStatusBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Row(
         children: [
-          _item(
-            torEnabled ? lang.tr('status.tor_on') : lang.tr('status.tor_off'),
-            onTorTap,
-            icon: torEnabled ? Icons.shield : Icons.shield_outlined,
-            iconColor: torEnabled ? Colors.greenAccent : Colors.white70,
-          ),
-          const SizedBox(width: 8),
           Flexible(
             child: _item(
                 fileName.isEmpty ? lang.tr('app.no_file_open') : fileName,

@@ -14,7 +14,6 @@ class SettingsModel extends ChangeNotifier {
   int get tabSize => _svc.tabSize;
   bool get wordWrap => _svc.wordWrap;
   String get autoSave => _svc.autoSave;
-  bool get torEnabled => _svc.torEnabled;
   bool get developerMode => _svc.developerMode;
   String get language => _svc.language;
 

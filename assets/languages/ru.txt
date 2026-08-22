@@ -63,8 +63,6 @@ editor.toggle_terminal=Переключить терминал
 tabs.unsaved=•
 
 # Статус-бар
-status.tor_on=Tor: ВКЛ
-status.tor_off=Tor: ВЫКЛ
 status.line_col=Стр {line}, Кол {col}
 status.encoding=UTF-8
 
@@ -101,7 +99,6 @@ settings.section.completion=Автодополнение
 settings.section.language=Язык
 settings.section.sync=Синхронизация
 settings.section.plugins=Плагины
-settings.section.network=Сеть
 settings.section.storage=Хранилище
 settings.section.developer=Разработчик
 settings.section.updates=Обновление программы
@@ -163,7 +160,6 @@ settings.plugins.docs=Документация по плагинам
 settings.plugins.docs_subtitle=Справочник Plugin API (RU / EN)
 
 # Сеть
-settings.network.tor=Tor Proxy (через Orbot)
 
 # Хранилище
 settings.storage.projects_folder=Папка проектов
@@ -237,6 +233,7 @@ libraries.registry_saved=URL реестра сохранён
 libraries.empty=Ничего не найдено
 libraries.copy_command=Скопировать команду установки
 libraries.copied=Команда скопирована
+feedback.title=Сообщить о проблеме
 feedback.tab_dev=Разработчику
 feedback.tab_market=На маркет
 feedback.category_bug=Ошибка

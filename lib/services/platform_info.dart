@@ -29,10 +29,6 @@ class PlatformInfo {
   /// На desktop используется системная оболочка, поэтому rootfs не нужен.
   static bool get needsRootfs => isAndroid;
 
-  /// Доступен ли Tor через Orbot.
-  /// На desktop используется обычный SOCKS5/HTTP-прокси.
-  static bool get supportsOrbot => isAndroid;
-
   /// Поддерживает ли платформа нативные горячие клавиши ОС
   /// (Cmd/Ctrl + ... через SingleActivator).
   static bool get supportsNativeShortcuts => isDesktop || isAndroid;

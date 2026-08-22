@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 
+import 'github_oauth_service.dart';
+
 /// Отправка сообщений о проблемах напрямую разработчику через
 /// Telegram Bot API — бесплатно, без своего сервера.
 ///
@@ -23,11 +25,41 @@ class FeedbackService {
   /// Каталог приложений разработчика (самохостинг).
   static const marketUrl = 'https://xuncode-market.vercel.app/';
 
+  /// База API каталога (без завершающего слэша).
+  static const _apiBase = 'https://xuncode-market.vercel.app';
+
   /// Вкладка «Идеи» каталога — туда ведёт кнопка в форме обратной связи.
   static const ideasUrl = '$marketUrl#ideas';
 
   static bool get configured =>
       !_botToken.startsWith('PUT_') && !_chatId.startsWith('PUT_');
+
+  /// Вошёл ли пользователь в GitHub на мобильном.
+  static Future<bool> get signedIn async =>
+      (await GithubOAuthService.getToken())?.isNotEmpty ?? false;
+
+  /// Отправка отчёта об ошибке админам через сайт (нужен вход через GitHub).
+  /// Возвращает true, если сайт принял отчёт.
+  static Future<bool> sendToSite({
+    required String category,
+    required String text,
+  }) async {
+    final token = await GithubOAuthService.getToken();
+    if (token == null || token.isEmpty) return false;
+    try {
+      final res = await Dio().post<Map<String, dynamic>>(
+        '$_apiBase/api/reports/submit',
+        data: jsonEncode({'category': category, 'text': text}),
+        options: Options(headers: {
+          'Content-Type': 'application/json',
+          'x-gh-token': token,
+        }),
+      ).timeout(const Duration(seconds: 20));
+      return res.statusCode == 200 && res.data?['ok'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
 
   /// Возвращает true, если Telegram принял сообщение.
   static Future<bool> send({

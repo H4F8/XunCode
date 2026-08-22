@@ -696,7 +696,6 @@ class PluginSandbox {
       case 'tabSize': return s.tabSize;
       case 'wordWrap': return s.wordWrap;
       case 'autoSave': return s.autoSave;
-      case 'torEnabled': return s.torEnabled;
       case 'developerMode': return s.developerMode;
       case 'language': return s.language;
       case 'completionEnabled': return s.completionEnabled;
@@ -719,7 +718,6 @@ class PluginSandbox {
       'tabSize': SettingsService.instance.tabSize,
       'wordWrap': SettingsService.instance.wordWrap,
       'autoSave': SettingsService.instance.autoSave,
-      'torEnabled': SettingsService.instance.torEnabled,
       'developerMode': SettingsService.instance.developerMode,
       'language': SettingsService.instance.language,
       'completionEnabled': SettingsService.instance.completionEnabled,
@@ -946,7 +944,7 @@ class PluginSandbox {
         };
 
         // ── assemble ────────────────────────────────────────────────────
-        window.vscode = {
+        window.xuncode = {
           editor, ui, storage, http, fs, workspace, terminal, process, settings,
           commands: commandsApi,
           hooks: {
@@ -957,7 +955,7 @@ class PluginSandbox {
             onSettingsChange: (cb) => on('onSettingsChange', cb),
           },
         };
-        window.xuncode = window.vscode;
+        window.vscode = window.xuncode; // обратная совместимость старых плагинов
 
         const moduleObj = { exports: {} };
         window.module = moduleObj;
@@ -967,7 +965,7 @@ class PluginSandbox {
           try {
             const ex = window.module.exports || window.exports || {};
             if (typeof ex.activate === 'function') {
-              ex.activate(window.vscode);
+              ex.activate(window.xuncode);
             }
           } catch (e) { console.error('plugin activate failed', e); }
         };

@@ -605,6 +605,17 @@ footer {
     </p>
     <button class="btn" id="a-load">Загрузить очередь</button>
     <div id="pending-list" style="margin-top:20px;"></div>
+
+    <h2 style="color:var(--green); font-size:14px; margin-top:32px; text-transform:uppercase; letter-spacing:.5px;">
+      🐞 Отчёты об ошибках из приложения (<span id="reports-count">0</span>)
+    </h2>
+    <div style="display:flex;gap:8px;margin:12px 0;">
+      <button class="btn btn-sm" id="r-load">Обновить отчёты</button>
+    </div>
+    <div id="reports-hint" style="display:none;color:var(--fg-muted);font-size:12px;margin-bottom:10px;">
+      Отчёты видны только администраторам после входа через GitHub.
+    </div>
+    <div id="reports-list"></div>
   </div>
 </section>
 
@@ -637,6 +648,7 @@ function showSection(name) {
   document.querySelector(`header nav button[data-tab="${name}"]`)?.classList.add('active');
   if (name === 'browse') loadPlugins();
   if (name === 'ideas') loadIdeas();
+  if (name === 'admin') loadReports();
   window.scrollTo(0, 0);
 }
 
@@ -938,6 +950,68 @@ async function deleteIdea(id, btn) {
 }
 
 document.getElementById('i-submit')?.addEventListener('click', submitIdea);
+
+// ── Reports (bug reports from the app, admin-only) ──────────────────
+const REPORT_CATS = { bug: '🐞 Ошибка', idea: '💡 Идея', other: '📦 Другое' };
+
+async function loadReports() {
+  const list = document.getElementById('reports-list');
+  const count = document.getElementById('reports-count');
+  const hint = document.getElementById('reports-hint');
+  if (!list) return;
+  const me = getGhUser();
+  if (!(me && me.login)) {
+    if (hint) hint.style.display = 'block';
+    list.innerHTML = '';
+    return;
+  }
+  if (hint) hint.style.display = 'none';
+  list.innerHTML = '<div class="empty" style="padding:20px">Загрузка…</div>';
+  try {
+    const r = await fetch('/api/reports/list', {
+      headers: { 'x-gh-token': localStorage.getItem('gh_token') || '' },
+    });
+    if (!r.ok) {
+      list.innerHTML = '<div class="empty" style="padding:20px">Нет доступа (нужен вход админа).</div>';
+      return;
+    }
+    const reports = await r.json();
+    if (count) count.textContent = Array.isArray(reports) ? reports.length : 0;
+    if (!Array.isArray(reports) || reports.length === 0) {
+      list.innerHTML = '<div class="empty" style="padding:20px">Отчётов пока нет.</div>';
+      return;
+    }
+    list.innerHTML = reports.map(rp => `
+      <div class="review-item">
+        <div class="review-header">
+          <span class="author">${esc(REPORT_CATS[rp.category] || '📦')} ${esc(rp.author || 'Аноним')}${rp.name ? ' · ' + esc(rp.name) : ''}</span>
+          <span class="date">${esc((rp.date || '').slice(0, 10))}</span>
+          <button class="btn btn-sm btn-danger" onclick="deleteReport('${esc(rp.id)}', this)">✕</button>
+        </div>
+        <div class="review-text" style="white-space:pre-wrap;">${esc(rp.text || '')}</div>
+      </div>
+    `).join('');
+  } catch (_) {
+    list.innerHTML = '<div class="empty" style="padding:20px">Не удалось загрузить отчёты.</div>';
+  }
+}
+
+async function deleteReport(id, btn) {
+  if (!confirm('Удалить этот отчёт?')) return;
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/reports/delete', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-gh-token': localStorage.getItem('gh_token') || '' },
+      body: JSON.stringify({ id }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (r.ok && data.ok) { toast('Отчёт удалён'); loadReports(); }
+    else { toast(data.error || 'Ошибка удаления', true); btn.disabled = false; }
+  } catch (_) { toast('Ошибка сети', true); btn.disabled = false; }
+}
+
+document.getElementById('r-load')?.addEventListener('click', loadReports);
 
 // ── GitHub auth ──────────────────────────────────────────────────────
 function getGhUser() {

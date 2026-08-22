@@ -85,7 +85,7 @@
 <!-- ── RU ────────────────────────────────────────────────────────────── -->
 <section class="lang-section active" data-lang="ru">
 
-<h1>VScode Mobile — Документация по плагинам</h1>
+<h1>XunCode — Документация по плагинам</h1>
 <p>Расширяйте редактор собственными плагинами на JavaScript. Плагины хранятся на GitHub и устанавливаются через встроенный маркетплейс.</p>
 
 <div class="toc">
@@ -119,9 +119,9 @@
 }</code></pre>
 
 <h3>3. Напишите main.js</h3>
-<pre><code>exports.activate = (vscode) => {
-  vscode.commands.registerCommand('hello.say', () => {
-    vscode.ui.showMessage('Привет из плагина!');
+<pre><code>exports.activate = (xuncode) => {
+  xuncode.commands.registerCommand('hello.say', () => {
+    xuncode.ui.showMessage('Привет из плагина!');
   });
 };</code></pre>
 
@@ -140,9 +140,10 @@
 </table>
 
 <h2 id="ru-api">Справочник API</h2>
-<p>В <code>activate(vscode)</code> вы получаете объект <code>vscode</code> с поверхностями API.</p>
+<p>В <code>activate(xuncode)</code> вы получаете объект <code>xuncode</code> с поверхностями API.</p>
+<p style="color:#9aa4b4;font-size:12px;margin-top:8px;">ℹ️ Старое имя <code>window.vscode</code> и <code>VscodePlugin.register()</code> продолжают работать как псевдонимы — существующие плагины совместимы.</p>
 
-<h3>vscode.editor</h3>
+<h3>xuncode.editor</h3>
 <p>Работа с активным редактором.</p>
 <table>
   <tr><th>Метод</th><th>Описание</th></tr>
@@ -162,7 +163,7 @@
   <tr><td><code>executeCommand(id)</code></td><td>Запускает команду Monaco</td></tr>
 </table>
 
-<h3>vscode.fs</h3>
+<h3>xuncode.fs</h3>
 <p>Файловая система пользователя.</p>
 <table>
   <tr><th>Метод</th><th>Описание</th></tr>
@@ -174,7 +175,7 @@
   <tr><td><code>watch(path, cb)</code></td><td>Подписка на изменения</td></tr>
 </table>
 
-<h3>vscode.workspace</h3>
+<h3>xuncode.workspace</h3>
 <table>
   <tr><th>Метод</th><th>Описание</th></tr>
   <tr><td><code>getRoot()</code></td><td>Корень проекта</td></tr>
@@ -184,7 +185,7 @@
   <tr><td><code>onDidOpenFile(cb)</code></td><td>Подписка на открытие</td></tr>
 </table>
 
-<h3>vscode.ui</h3>
+<h3>xuncode.ui</h3>
 <table>
   <tr><th>Метод</th><th>Описание</th></tr>
   <tr><td><code>showMessage(text)</code></td><td>Snackbar-уведомление</td></tr>
@@ -196,21 +197,21 @@
   <tr><td><code>createWebViewPanel()</code></td><td>Панель WebView</td></tr>
 </table>
 
-<h3>vscode.commands</h3>
+<h3>xuncode.commands</h3>
 <table>
   <tr><th>Метод</th><th>Описание</th></tr>
   <tr><td><code>registerCommand(id, cb)</code></td><td>Регистрирует команду</td></tr>
   <tr><td><code>executeCommand(id)</code></td><td>Запускает команду по id</td></tr>
 </table>
 
-<h3>vscode.terminal</h3>
+<h3>xuncode.terminal</h3>
 <table>
   <tr><th>Метод</th><th>Описание</th></tr>
   <tr><td><code>create()</code></td><td>Новый терминал</td></tr>
   <tr><td><code>runCommand(cmd)</code></td><td>Выполнить команду</td></tr>
 </table>
 
-<h3>vscode.http</h3>
+<h3>xuncode.http</h3>
 <p>Если включён Tor, запросы идут через прокси Orbot.</p>
 <table>
   <tr><th>Метод</th><th>Описание</th></tr>
@@ -218,7 +219,7 @@
   <tr><td><code>post(url, body, headers?)</code></td><td>POST-запрос</td></tr>
 </table>
 
-<h3>vscode.storage</h3>
+<h3>xuncode.storage</h3>
 <table>
   <tr><th>Метод</th><th>Описание</th></tr>
   <tr><td><code>get(key)</code></td><td>Чтение значения</td></tr>
@@ -227,7 +228,7 @@
   <tr><td><code>clear()</code></td><td>Очистка всех ключей плагина</td></tr>
 </table>
 
-<h3>vscode.hooks</h3>
+<h3>xuncode.hooks</h3>
 <table>
   <tr><th>Хук</th><th>Когда срабатывает</th></tr>
   <tr><td><code>onSave(cb)</code></td><td>При сохранении файла</td></tr>
@@ -240,21 +241,21 @@
 <h2 id="ru-examples">Примеры</h2>
 
 <h3>Счётчик слов</h3>
-<pre><code>exports.activate = (vscode) => {
-  vscode.commands.registerCommand('words.count', async () => {
-    const text = await vscode.editor.getText();
+<pre><code>exports.activate = (xuncode) => {
+  xuncode.commands.registerCommand('words.count', async () => {
+    const text = await xuncode.editor.getText();
     const n = text.trim().split(/\s+/).filter(Boolean).length;
-    vscode.ui.showMessage('Слов: ' + n);
+    xuncode.ui.showMessage('Слов: ' + n);
   });
 };</code></pre>
 
 <h3>Авто-заголовок</h3>
-<pre><code>exports.activate = (vscode) => {
-  vscode.commands.registerCommand('header.insert', async () => {
+<pre><code>exports.activate = (xuncode) => {
+  xuncode.commands.registerCommand('header.insert', async () => {
     const date = new Date().toISOString().split('T')[0];
-    const lang = await vscode.editor.getLanguage();
+    const lang = await xuncode.editor.getLanguage();
     const c = lang === 'python' ? '#' : '//';
-    await vscode.editor.insertText(`${c} Created: ${date}\n`);
+    await xuncode.editor.insertText(`${c} Created: ${date}\n`);
   });
 };</code></pre>
 
@@ -272,10 +273,10 @@
 <p>Удалите его в маркетплейсе и установите заново — будет загружена последняя версия с GitHub.</p>
 
 <h3>Где данные плагина?</h3>
-<p>Каждый плагин получает свой namespace в <code>vscode.storage</code>. Данные изолированы от других плагинов.</p>
+<p>Каждый плагин получает свой namespace в <code>xuncode.storage</code>. Данные изолированы от других плагинов.</p>
 
 <h3>Можно ли вызывать сетевые API?</h3>
-<p>Да, через <code>vscode.http</code>. Если в настройках включён Tor, запросы пойдут через Orbot.</p>
+<p>Да, через <code>xuncode.http</code>. Если в настройках включён Tor, запросы пойдут через Orbot.</p>
 
 <h2 id="ru-support">Поддержка</h2>
 <div class="support">
@@ -289,7 +290,7 @@
 <!-- ── EN ────────────────────────────────────────────────────────────── -->
 <section class="lang-section" data-lang="en">
 
-<h1>VScode Mobile — Plugin Documentation</h1>
+<h1>XunCode — Plugin Documentation</h1>
 <p>Extend the editor with your own JavaScript plugins. Plugins live on GitHub and install through the in-app marketplace.</p>
 
 <div class="toc">
@@ -319,9 +320,9 @@
   "main": "main.js"
 }</code></pre>
 
-<pre><code>exports.activate = (vscode) => {
-  vscode.commands.registerCommand('hello.say', () => {
-    vscode.ui.showMessage('Hello from plugin!');
+<pre><code>exports.activate = (xuncode) => {
+  xuncode.commands.registerCommand('hello.say', () => {
+    xuncode.ui.showMessage('Hello from plugin!');
   });
 };</code></pre>
 
@@ -337,53 +338,53 @@
 </table>
 
 <h2 id="en-api">API Reference</h2>
-<p>The <code>vscode</code> object exposes the following surfaces.</p>
+<p>The <code>xuncode</code> object exposes the following surfaces.</p>
 
-<h3>vscode.editor</h3>
+<h3>xuncode.editor</h3>
 <p><code>getText, setText, getSelection, setSelection, insertText, replaceRange, getLine, getLines, getLanguage, setLanguage, formatDocument, getCursorPosition, setCursorPosition, executeCommand</code></p>
 
-<h3>vscode.fs</h3>
+<h3>xuncode.fs</h3>
 <p><code>readFile, writeFile, delete, exists, listDir, watch</code></p>
 
-<h3>vscode.workspace</h3>
+<h3>xuncode.workspace</h3>
 <p><code>getRoot, openFile, findFiles, onDidSaveFile, onDidOpenFile</code></p>
 
-<h3>vscode.ui</h3>
+<h3>xuncode.ui</h3>
 <p><code>showMessage, showError, showInputBox, showQuickPick, showProgress, createStatusBarItem, createWebViewPanel</code></p>
 
-<h3>vscode.commands</h3>
+<h3>xuncode.commands</h3>
 <p><code>registerCommand(id, cb)</code>, <code>executeCommand(id)</code></p>
 
-<h3>vscode.terminal</h3>
+<h3>xuncode.terminal</h3>
 <p><code>create()</code>, <code>runCommand(cmd)</code></p>
 
-<h3>vscode.http</h3>
+<h3>xuncode.http</h3>
 <p><code>get(url, headers?)</code>, <code>post(url, body, headers?)</code> — proxied through Tor when enabled.</p>
 
-<h3>vscode.storage</h3>
+<h3>xuncode.storage</h3>
 <p><code>get, set, delete, clear</code> — namespaced per plugin.</p>
 
-<h3>vscode.hooks</h3>
+<h3>xuncode.hooks</h3>
 <p><code>onSave, onFileOpen, onEditorChange, onCursorMove, onSettingsChange</code></p>
 
 <h2 id="en-examples">Examples</h2>
 
 <h3>Word counter</h3>
-<pre><code>exports.activate = (vscode) => {
-  vscode.commands.registerCommand('words.count', async () => {
-    const text = await vscode.editor.getText();
+<pre><code>exports.activate = (xuncode) => {
+  xuncode.commands.registerCommand('words.count', async () => {
+    const text = await xuncode.editor.getText();
     const n = text.trim().split(/\s+/).filter(Boolean).length;
-    vscode.ui.showMessage('Words: ' + n);
+    xuncode.ui.showMessage('Words: ' + n);
   });
 };</code></pre>
 
 <h3>Auto header</h3>
-<pre><code>exports.activate = (vscode) => {
-  vscode.commands.registerCommand('header.insert', async () => {
+<pre><code>exports.activate = (xuncode) => {
+  xuncode.commands.registerCommand('header.insert', async () => {
     const date = new Date().toISOString().split('T')[0];
-    const lang = await vscode.editor.getLanguage();
+    const lang = await xuncode.editor.getLanguage();
     const c = lang === 'python' ? '#' : '//';
-    await vscode.editor.insertText(`${c} Created: ${date}\n`);
+    await xuncode.editor.insertText(`${c} Created: ${date}\n`);
   });
 };</code></pre>
 
@@ -401,10 +402,10 @@
 <p>Uninstall it in the marketplace and install again — the latest version is fetched from GitHub.</p>
 
 <h3>Where is plugin data stored?</h3>
-<p>Each plugin gets its own namespace in <code>vscode.storage</code>. Data is isolated between plugins.</p>
+<p>Each plugin gets its own namespace in <code>xuncode.storage</code>. Data is isolated between plugins.</p>
 
 <h3>Can plugins make network calls?</h3>
-<p>Yes, via <code>vscode.http</code>. When Tor is enabled in settings, requests are routed through Orbot.</p>
+<p>Yes, via <code>xuncode.http</code>. When Tor is enabled in settings, requests are routed through Orbot.</p>
 
 <h2 id="en-support">Support</h2>
 <div class="support">
