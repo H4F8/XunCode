@@ -44,25 +44,45 @@ class _ReportSheetState extends State<_ReportSheet>
     super.dispose();
   }
 
+  String? _failReason; // локализованная причина последней неудачи
+
   Future<void> _send() async {
     if (_ctrl.text.trim().isEmpty) return;
-    setState(() => _state = _SendState.sending);
+    setState(() {
+      _state = _SendState.sending;
+      _failReason = null;
+    });
     final lang = LanguageService.of(context, listen: false);
     final category = lang.tr('feedback.category_$_category');
-    // Приоритет — сайт: отчёт попадает напрямую к админам, если выполнен
-    // вход через GitHub. Иначе — старый путь через Telegram-бота.
+
     bool ok = false;
+    bool siteAttempted = false;
     if (await FeedbackService.signedIn) {
-      ok = await FeedbackService.sendToSite(
+      siteAttempted = true;
+      final r = await FeedbackService.sendToSite(
         category: _category,
         text: _ctrl.text.trim(),
       );
+      if (r.ok) ok = true;
+      if (!ok && mounted) {
+        _failReason = switch (r.error) {
+          'auth' => lang.tr('feedback.err_signin'),
+          'rate_limited' => lang.tr('feedback.err_rate',
+              params: {'min': r.retryAfterMin}),
+          'network' => lang.tr('feedback.err_network'),
+          _ => null, // прочее — попробуем Telegram-путь
+        };
+      }
     }
     if (!ok) {
-      ok = await FeedbackService.send(
+      final tgOk = await FeedbackService.send(
         category: category,
         text: _ctrl.text.trim(),
       );
+      if (tgOk) ok = true;
+      else if (!siteAttempted && !FeedbackService.configured && _failReason == null) {
+        _failReason = lang.tr('feedback.not_configured');
+      }
     }
     if (!mounted) return;
     setState(() => _state = ok ? _SendState.sent : _SendState.failed);
@@ -167,6 +187,12 @@ class _ReportSheetState extends State<_ReportSheet>
                 children: [
                   _resultRow(Icons.error_outline,
                       lang.tr('feedback.failed'), color: VscodeTheme.red),
+                  if (_failReason != null) ...[
+                    const SizedBox(height: 4),
+                    Text(_failReason!,
+                        style: const TextStyle(
+                            color: VscodeTheme.fgMuted, fontSize: 11)),
+                  ],
                   const SizedBox(height: 8),
                   OutlinedButton.icon(
                     icon: const Icon(Icons.copy, size: 14),

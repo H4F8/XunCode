@@ -38,14 +38,17 @@ class FeedbackService {
   static Future<bool> get signedIn async =>
       (await GithubOAuthService.getToken())?.isNotEmpty ?? false;
 
-  /// Отправка отчёта об ошибке админам через сайт (нужен вход через GitHub).
-  /// Возвращает true, если сайт принял отчёт.
-  static Future<bool> sendToSite({
+  /// Результат отправки отчёта на сайт.
+  /// [error]: auth — нет/просрочена GitHub-сессия; rate_limited — кулдаун
+  /// (retryAfterMin минут); network — сеть/недоступность сайта.
+  static Future<({bool ok, String error, int retryAfterMin})> sendToSite({
     required String category,
     required String text,
   }) async {
     final token = await GithubOAuthService.getToken();
-    if (token == null || token.isEmpty) return false;
+    if (token == null || token.isEmpty) {
+      return (ok: false, error: 'auth', retryAfterMin: 0);
+    }
     try {
       final res = await Dio().post<Map<String, dynamic>>(
         '$_apiBase/api/reports/submit',
@@ -55,9 +58,25 @@ class FeedbackService {
           'x-gh-token': token,
         }),
       ).timeout(const Duration(seconds: 20));
-      return res.statusCode == 200 && res.data?['ok'] == true;
+      final code = res.statusCode ?? 0;
+      if (code == 200 && res.data?['ok'] == true) {
+        return (ok: true, error: '', retryAfterMin: 0);
+      }
+      final err = res.data?['error']?.toString() ?? '';
+      if (code == 429 || err.contains('rate_limited')) {
+        final min = res.data?['retryAfterMin'];
+        return (
+          ok: false,
+          error: 'rate_limited',
+          retryAfterMin: min is int ? min : int.tryParse('$min') ?? 3,
+        );
+      }
+      if (code == 401 || err.contains('auth')) {
+        return (ok: false, error: 'auth', retryAfterMin: 0);
+      }
+      return (ok: false, error: 'server', retryAfterMin: 0);
     } catch (_) {
-      return false;
+      return (ok: false, error: 'network', retryAfterMin: 0);
     }
   }
 

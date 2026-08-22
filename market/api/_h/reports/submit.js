@@ -30,7 +30,7 @@ module.exports = async (req, res) => {
     try { body = JSON.parse(body); } catch (_) { body = {}; }
   }
 
-  const user = requireGhUser(req, body);
+  const user = await requireGhUser(req, body);
   if (!user || !user.login) {
     return res.status(401).json({ error: 'auth_required' });
   }

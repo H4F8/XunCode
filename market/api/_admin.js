@@ -36,6 +36,45 @@ function adminLogins() {
     .filter(Boolean);
 }
 
+// The XunCode app authenticates via GitHub Device Flow and stores the raw
+// OAuth access token (gho_/ghp_/github_pat_…). Web visitors instead carry our
+// signed session token. Both are accepted:
+//   1. signed session (fast, no network)
+//   2. raw access token validated live against api.github.com/user
+const GH_TOKEN_RE = /^(gho_|ghp_|ghu_|ghs_|github_pat_)/;
+
+async function ghUserFromAccessToken(accessToken) {
+  if (typeof accessToken !== 'string' || !GH_TOKEN_RE.test(accessToken)) return null;
+  try {
+    const r = await fetch('https://api.github.com/user', {
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        'user-agent': 'xuncode-market',
+        accept: 'application/vnd.github+json',
+      },
+    });
+    if (!r.ok) return null;
+    const u = await r.json();
+    if (!u || !u.login) return null;
+    return {
+      login: String(u.login),
+      name: typeof u.name === 'string' ? u.name : '',
+      avatar: typeof u.avatar_url === 'string' ? u.avatar_url : '',
+      created: typeof u.created_at === 'string' ? u.created_at : '',
+      admin: adminLogins().includes(String(u.login).toLowerCase()),
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
+function extractToken(req, body) {
+  return (
+    req.headers['x-gh-token'] ||
+    (body && typeof body === 'object' ? body.ghToken : undefined)
+  );
+}
+
 // Returns { ok: true } or { ok: false, error } — await it from endpoints.
 async function checkAdmin(req, body) {
   const keyHeader = req.headers['x-admin-key'];
@@ -48,9 +87,10 @@ async function checkAdmin(req, body) {
   const secret = process.env.AUTH_SECRET || process.env.ADMIN_API_KEY;
   if (!secret) return { ok: false, error: 'admin auth not configured' };
 
-  const token =
-    req.headers['x-gh-token'] || (body && typeof body === 'object' ? body.ghToken : undefined);
-  const user = verifyGhToken(token, secret);
+  const token = extractToken(req, body);
+  let user =
+    (typeof token === 'string' ? verifyGhToken(token, secret) : null) ||
+    (await ghUserFromAccessToken(token));
   if (!user) return { ok: false, error: 'GitHub session required' };
 
   if (!adminLogins().includes(String(user.login).toLowerCase())) {
@@ -59,14 +99,16 @@ async function checkAdmin(req, body) {
   return { ok: true };
 }
 
-// Verifies the request carries a valid signed GitHub session and returns its
-// payload ({login,name,avatar,admin,created,exp}) or null.
-function requireGhUser(req, body) {
+// Verifies the request carries a valid signed session OR a real GitHub
+// access token; returns the user payload or null.
+async function requireGhUser(req, body) {
   const secret = process.env.AUTH_SECRET || process.env.ADMIN_API_KEY;
   if (!secret) return null;
-  const token =
-    req.headers['x-gh-token'] || (body && typeof body === 'object' ? body.ghToken : undefined);
-  return verifyGhToken(token, secret);
+  const token = extractToken(req, body);
+  if (typeof token !== 'string' || !token) return null;
+  const sess = verifyGhToken(token, secret);
+  if (sess) return sess;
+  return ghUserFromAccessToken(token);
 }
 
 // Minimum GitHub account age for public write actions (anti-abuse).
