@@ -24,7 +24,7 @@ class GithubOAuthService {
   // time with `--dart-define=GITHUB_CLIENT_ID=...`.
   static const _clientId = String.fromEnvironment(
     'GITHUB_CLIENT_ID',
-    defaultValue: 'Ov23liReplaceWithYourClientId',
+    defaultValue: 'Iv23lihRr5ozQ4gHw19H',
   );
   static const _scope = 'repo,read:user';
 
